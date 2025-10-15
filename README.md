@@ -1,73 +1,360 @@
-# React + TypeScript + Vite
+# 3D Collaborative Project Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A real-time 3D collaborative platform built with React, TypeScript, Three.js, and Socket.IO. Multiple users can view, manipulate 3D models, add annotations, and chat in real-time.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Core Functionality
+- ✅ **Real-time Collaboration** - Multiple users can work simultaneously
+- ✅ **3D Model Management** - Add, transform, and manage 3D primitives
+- ✅ **Annotations System** - Click-to-place annotations in 3D space
+- ✅ **Live Chat** - Real-time messaging with typing indicators
+- ✅ **Camera Synchronization** - See where other users are looking
+- ✅ **Project Management** - Create, view, and share projects
+- ✅ **Responsive Design** - Works on desktop, tablet, and mobile
 
-## React Compiler
+### 3D Viewer
+- **Camera Controls**: Pan, zoom, rotate with mouse/touch
+- **5 Primitive Models**: Box, Sphere, Cylinder, Cone, Torus
+- **Transform Controls**: Move models with visual gizmos
+- **Color Customization**: 8 presets + custom color picker
+- **Visibility Toggle**: Show/hide models
+- **Real-time Shadows**: Dynamic shadow rendering
+- **Grid Helper**: Spatial reference grid
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Annotations
+- **Click-to-Place**: Click anywhere in 3D space
+- **3D Markers**: Floating spheres with text labels
+- **Color-coded**: 10 color presets + custom
+- **Hover Effects**: Interactive highlighting
+- **Visibility Control**: Toggle annotation display
+- **Auto-refresh**: Updates every 5 seconds
 
-## Expanding the ESLint configuration
+### Chat
+- **Real-time Messages**: Instant delivery via Socket.IO
+- **Typing Indicators**: See who's typing
+- **Message History**: Last 50 messages loaded
+- **System Notifications**: User join/leave alerts
+- **Auto-scroll**: To latest messages
+- **Character Limit**: Up to 1000 characters
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 📋 Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 16.x or higher
+- npm or yarn
+- Backend server running (see backend setup)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🛠️ Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd frontend
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Install Dependencies
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
+
+### 3. Environment Configuration
+
+Create a `.env` file in the root directory:
+
+```env
+VITE_API_URL=http://localhost:5000
+VITE_API_VERSION=v1
+VITE_SOCKET_URL=http://localhost:5000
+VITE_ENABLE_LOGGING=true
+VITE_ENABLE_DEBUG=false
+```
+
+**Environment Variables:**
+- `VITE_API_URL` - Backend API base URL
+- `VITE_API_VERSION` - API version (default: v1)
+- `VITE_SOCKET_URL` - Socket.IO server URL
+- `VITE_ENABLE_LOGGING` - Enable console logging (true/false)
+- `VITE_ENABLE_DEBUG` - Enable debug mode (true/false)
+
+### 4. Start Development Server
+
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:3000`
+
+## 🏗️ Build for Production
+
+```bash
+npm run build
+```
+
+Build output will be in the `dist` directory.
+
+## 📁 Project Structure
+
+```
+frontend/
+├── public/                 # Static assets
+├── src/
+│   ├── components/        # React components
+│   │   ├── auth/         # Authentication components
+│   │   ├── projects/     # Project management
+│   │   ├── ui/           # shadcn/ui components
+│   │   └── viewer/       # 3D viewer components
+│   ├── config/           # Configuration files
+│   ├── hooks/            # Custom React hooks
+│   ├── lib/              # Utility libraries
+│   ├── pages/            # Page components
+│   ├── services/         # API services
+│   ├── store/            # Zustand state management
+│   ├── types/            # TypeScript type definitions
+│   ├── validators/       # Zod validation schemas
+│   ├── App.tsx           # Main app component
+│   ├── main.tsx          # Entry point
+│   └── index.css         # Global styles
+├── .env                  # Environment variables
+├── .env.example          # Environment template
+├── package.json          # Dependencies
+├── tsconfig.json         # TypeScript config
+├── vite.config.ts        # Vite config
+└── tailwind.config.js    # Tailwind CSS config
+```
+
+## 🎮 Usage Guide
+
+### Login
+1. Navigate to `/login`
+2. Enter a username (2-50 characters, alphanumeric + underscore/hyphen)
+3. Example usernames: `alice`, `bob123`, `engineer_1`
+
+### Create Project
+1. Click **"New Project"** button
+2. Enter project title and description (optional)
+3. Click **"Create Project"**
+4. You'll be redirected to the 3D viewer
+
+### Add Models
+1. Click the **blue "+" button** (bottom-right)
+2. Choose geometry type (Box, Sphere, etc.)
+3. Enter model name
+4. Select color
+5. Click **"Add Model"**
+
+### Transform Models
+1. Click **layers button** to open model list
+2. Click on a model to select it
+3. Drag the transform gizmo to move the model
+4. Changes auto-save to backend
+
+### Add Annotations
+1. Click **"Add Annotation"** in right panel
+2. Cursor changes to crosshair
+3. Click anywhere in 3D space
+4. Enter annotation text
+5. Choose color
+6. Click **"Create Annotation"**
+
+### Chat
+1. Type message in chat input (left panel)
+2. Press **Enter** to send
+3. See real-time messages from other users
+4. Typing indicators show active users
+
+### Camera Controls
+- **Rotate**: Left-click and drag
+- **Pan**: Right-click and drag (or two-finger drag on mobile)
+- **Zoom**: Scroll wheel (or pinch on mobile)
+
+## 🔧 Technologies
+
+### Frontend Stack
+- **React 18** - UI library
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **React Router v6** - Routing
+- **Zustand** - State management
+- **Three.js** - 3D rendering
+- **@react-three/fiber** - React renderer for Three.js
+- **@react-three/drei** - Three.js helpers
+- **Socket.IO Client** - Real-time communication
+- **Axios** - HTTP client
+- **React Hook Form** - Form handling
+- **Zod** - Schema validation
+- **shadcn/ui** - UI components
+- **Tailwind CSS v4** - Styling
+- **Sonner** - Toast notifications
+- **Lucide React** - Icons
+
+## 🎨 Design System
+
+### Colors (Slate Theme)
+- **Primary**: Blue (#60a5fa)
+- **Background**: Slate-950 (dark mode)
+- **Borders**: Slate-800
+- **Text**: White/Slate-100
+
+### Typography
+- **Font**: System font stack
+- **Sizes**: Responsive (rem-based)
+
+### Spacing
+- **Grid**: 4px base unit
+- **Breakpoints**: 
+  - Mobile: < 768px
+  - Tablet: 768px - 1024px
+  - Desktop: > 1024px
+
+## 📡 API Integration
+
+### REST Endpoints
+
+**Authentication**
+- `POST /api/v1/auth/login` - Login
+- `GET /api/v1/auth/me` - Get current user
+- `POST /api/v1/auth/logout` - Logout
+
+**Projects**
+- `GET /api/v1/projects` - List projects
+- `POST /api/v1/projects` - Create project
+- `GET /api/v1/projects/:id` - Get project
+- `PUT /api/v1/projects/:id` - Update project
+- `DELETE /api/v1/projects/:id` - Delete project
+
+**Models**
+- `POST /api/v1/projects/:id/models` - Add model
+- `PUT /api/v1/projects/:id/models/:modelId` - Update model
+- `DELETE /api/v1/projects/:id/models/:modelId` - Delete model
+
+**Annotations**
+- `GET /api/v1/annotations/project/:projectId` - List annotations
+- `POST /api/v1/annotations` - Create annotation
+- `PUT /api/v1/annotations/:id` - Update annotation
+- `DELETE /api/v1/annotations/:id` - Delete annotation
+
+**Chat**
+- `GET /api/v1/chat/projects/:projectId/recent` - Get messages
+- `POST /api/v1/chat/messages` - Send message
+
+### Socket.IO Events
+
+**Project Events**
+- `project:join` - Join project room
+- `project:leave` - Leave project room
+- `project:user-joined` - User joined notification
+- `project:user-left` - User left notification
+
+**Camera Events**
+- `camera:update` - Broadcast camera position
+- `camera:updated` - Receive camera updates
+
+**Annotation Events**
+- `annotation:create` - Create annotation
+- `annotation:created` - Annotation created notification
+- `annotation:update` - Update annotation
+- `annotation:updated` - Annotation updated notification
+- `annotation:delete` - Delete annotation
+- `annotation:deleted` - Annotation deleted notification
+
+**Chat Events**
+- `chat:message` - Send message
+- `chat:typing` - Typing indicator
+
+## 🧪 Development
+
+### Code Quality
+- ESLint for linting
+- TypeScript strict mode
+- Prettier for formatting (recommended)
+
+### Best Practices
+- Component-based architecture
+- Type-safe throughout
+- Custom hooks for reusability
+- Service layer for API calls
+- Error boundaries for error handling
+- Loading states for async operations
+- Toast notifications for user feedback
+
+## 🚀 Deployment
+
+### Build
+
+```bash
+npm run build
+```
+
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
+### Deploy
+
+The `dist` folder can be deployed to any static hosting:
+- Vercel
+- Netlify
+- AWS S3 + CloudFront
+- DigitalOcean App Platform
+- Railway
+- Render
+
+### Example: Vercel Deployment
+
+```bash
+npm install -g vercel
+vercel --prod
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**1. Backend Connection Error**
+- Ensure backend server is running
+- Check `VITE_API_URL` in `.env`
+- Verify CORS settings on backend
+
+**2. Socket.IO Not Connecting**
+- Check `VITE_SOCKET_URL` matches backend
+- Ensure WebSocket is not blocked by firewall
+- Check browser console for errors
+
+**3. 3D Models Not Rendering**
+- Check WebGL support in browser
+- Clear browser cache
+- Check console for Three.js errors
+
+**4. Authentication Issues**
+- Clear localStorage
+- Check JWT token validity
+- Verify backend authentication endpoint
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 👥 Contributors
+
+- Ravija Gunawardana - Initial work
+
+## 🙏 Acknowledgments
+
+- Three.js community
+- React Three Fiber team
+- shadcn/ui for beautiful components
+- Socket.IO for real-time features
+
+## 📞 Support
+
+For issues and questions:
+- Create an issue on GitHub
+- Contact: your-email@example.com
+
+---
+
+**Built with ❤️ using React, TypeScript, and Three.js**

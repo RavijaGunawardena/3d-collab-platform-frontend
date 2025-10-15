@@ -72,6 +72,7 @@ export interface Project {
     | {
         _id: string;
         username: string;
+        id: string;
       };
   models: Model3D[];
   cameraState: CameraState;
@@ -95,6 +96,7 @@ export interface ProjectListItem {
     | {
         _id: string;
         username: string;
+        id: string
       };
   createdAt: Date;
 }

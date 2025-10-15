@@ -5,10 +5,11 @@ import { Toaster } from "sonner";
 import LoginPage from "./pages/Loginpage";
 import useAuthStore from "./store/authStore";
 import AuthProvider from "./components/auth/AuthProvider";
-// import ProtectedRoute from "./components/auth/ProtectedRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Lazy loaded pages
-// const ProjectPages = lazy(() => import())
+const ProjectPages = lazy(() => import("@/pages/ProjectsPage"));
+const ProjectViewerPage = lazy(() => import("@/pages/ProjectViewerPage"));
 
 /**
  * Loading Fallback Component
@@ -30,7 +31,6 @@ function PageLoadingFallback() {
  */
 function RootRedirect() {
   const { isAuthenticated, isInitialized } = useAuthStore();
-
 
   if (!isInitialized) {
     return <PageLoadingFallback />;
@@ -66,19 +66,22 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
 
             {/* Protected Routes */}
-            {/* <Route
-            path="/"
-            // element={<ProtectedRoute></ProtectedRoute>}
-          /> */}
-
-            {/* <Route
-            path="/project/:id"
-            // element={
-            //   <ProtectedRoute>
-            //     <ProjectViewerPage />
-            //   </ProtectedRoute>
-            // }
-          /> */}
+            <Route
+              path="/projects"
+              element={
+                <ProtectedRoute>
+                  <ProjectPages />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project/:id"
+              element={
+                <ProtectedRoute>
+                  <ProjectViewerPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Catch-all redirect to home */}
             <Route path="*" element={<Navigate to="/" replace />} />

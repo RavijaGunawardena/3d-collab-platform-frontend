@@ -53,7 +53,7 @@ export function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/", { replace: true });
+      navigate("/projects", { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -72,7 +72,7 @@ export function LoginPage() {
       });
 
       // Navigate to projects page
-      navigate("/", { replace: true });
+      navigate("/projects", { replace: true });
     } catch (error) {
       console.error("Login error:", error);
 
