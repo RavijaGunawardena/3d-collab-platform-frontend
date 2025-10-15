@@ -31,7 +31,6 @@ function PageLoadingFallback() {
 function RootRedirect() {
   const { isAuthenticated, isInitialized } = useAuthStore();
 
-  console.log("isAuthenticated", isAuthenticated);
 
   if (!isInitialized) {
     return <PageLoadingFallback />;

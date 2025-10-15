@@ -109,9 +109,17 @@ export const apiEndpoints = {
   projects: {
     list: "/projects",
     create: "/projects",
+    myProjects: "projects/my-projects",
     detail: (id: string) => `/projects/${id}`,
     update: (id: string) => `/projects/${id}`,
     delete: (id: string) => `/projects/${id}`,
+    addModel: (id: string) => `/projects/${id}/models`,
+    updateModel: (projectId: string, modelId: string) =>
+      `/projects/${projectId}/models/${modelId}`,
+    deleteModel: (projectId: string, modelId: string) =>
+      `/projects/${projectId}/models/${modelId}`,
+    addCamera: (projectId: string) =>
+      `/projects/${projectId}/camera`,
   },
   annotations: {
     list: (projectId: string) => `/projects/${projectId}/annotations`,
