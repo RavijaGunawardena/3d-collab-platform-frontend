@@ -18,9 +18,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
-/**
- * Annotation Panel Props
- */
 interface AnnotationPanelProps {
   projectId: string;
   onAnnotationSelect: (annotation: Annotation | null) => void;
@@ -29,10 +26,6 @@ interface AnnotationPanelProps {
   isPlacingMode: boolean;
 }
 
-/**
- * Annotation Panel Component
- * Sidebar panel for managing annotations with real-time updates
- */
 export function AnnotationPanel({
   projectId,
   onAnnotationSelect,
@@ -44,19 +37,15 @@ export function AnnotationPanel({
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  /**
-   * Real-time annotation sync
-   */
   const { createAnnotation, updateAnnotation, deleteAnnotation } =
     useAnnotationSync(
       projectId,
       (data) => {
-        // Real-time annotation created
         const newAnnotation = transformBackendAnnotation(data.annotation);
         setAnnotations((prev) => [...prev, newAnnotation]);
+        toast.success("New annotation added");
       },
       (data) => {
-        // Real-time annotation updated
         setAnnotations((prev) =>
           prev.map((ann) =>
             ann.id === data.annotationId ? { ...ann, ...data.updates } : ann
@@ -64,24 +53,20 @@ export function AnnotationPanel({
         );
       },
       (data) => {
-        // Real-time annotation deleted
         setAnnotations((prev) =>
           prev.filter((ann) => ann.id !== data.annotationId)
         );
 
-        // Deselect if deleted
         if (selectedAnnotationId === data.annotationId) {
           onAnnotationSelect(null);
         }
+        toast.success("Annotation deleted");
       }
     );
 
-  /**
-   * Transform backend annotation to frontend format
-   */
   const transformBackendAnnotation = (backendAnnotation: any): Annotation => {
     return {
-      id: backendAnnotation._id,
+      id: backendAnnotation._id || backendAnnotation.id,
       projectId: backendAnnotation.projectId,
       modelId: backendAnnotation.modelId,
       userId: backendAnnotation.userId,
@@ -97,14 +82,12 @@ export function AnnotationPanel({
     };
   };
 
-  /**
-   * Fetch annotations
-   */
   const fetchAnnotations = async () => {
     try {
       setIsLoading(true);
       const data = await annotationService.getAnnotationsByProject(projectId);
-      setAnnotations(data);
+      const transformedAnnotations = data.map(transformBackendAnnotation);
+      setAnnotations(transformedAnnotations);
     } catch (error) {
       console.error("Failed to fetch annotations:", error);
       toast.error("Failed to Load Annotations");
@@ -113,16 +96,10 @@ export function AnnotationPanel({
     }
   };
 
-  /**
-   * Load annotations on mount
-   */
   useEffect(() => {
     fetchAnnotations();
   }, [projectId]);
 
-  /**
-   * Handle delete annotation
-   */
   const handleDelete = async (annotationId: string) => {
     if (!confirm("Are you sure you want to delete this annotation?")) {
       return;
@@ -130,19 +107,11 @@ export function AnnotationPanel({
 
     try {
       setIsDeleting(true);
-
-      // Delete via API
       await annotationService.deleteAnnotation(annotationId);
-
-      // Also emit via socket for real-time updates
       deleteAnnotation(annotationId);
 
-      toast.success("Annotation Deleted");
-
-      // Remove from local state (will also be removed by real-time event)
       setAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
 
-      // Deselect if deleted
       if (selectedAnnotationId === annotationId) {
         onAnnotationSelect(null);
       }
@@ -156,28 +125,15 @@ export function AnnotationPanel({
     }
   };
 
-  /**
-   * Handle toggle visibility
-   */
   const handleToggleVisibility = async (annotation: Annotation) => {
     try {
-      // Update via API
-      const updatedAnnotation = await annotationService.toggleVisibility(
-        annotation.id
-      );
-
-      // Emit via socket for real-time updates
+      await annotationService.toggleVisibility(annotation.id);
       updateAnnotation(annotation.id, { visible: !annotation.visible });
 
-      // Update local state (will also be updated by real-time event)
       setAnnotations((prev) =>
         prev.map((a) =>
           a.id === annotation.id ? { ...a, visible: !a.visible } : a
         )
-      );
-
-      toast.success(
-        annotation.visible ? "Annotation Hidden" : "Annotation Visible"
       );
     } catch (error: any) {
       console.error("Failed to toggle visibility:", error);
@@ -187,9 +143,6 @@ export function AnnotationPanel({
     }
   };
 
-  /**
-   * Get username from annotation
-   */
   const getUsername = (annotation: Annotation): string => {
     if (typeof annotation.userId === "object") {
       return annotation.userId.username;
@@ -197,9 +150,6 @@ export function AnnotationPanel({
     return annotation.username || "Unknown";
   };
 
-  /**
-   * Format date
-   */
   const formatDate = (date: Date | string): string => {
     return new Date(date).toLocaleDateString("en-US", {
       month: "short",
@@ -211,14 +161,12 @@ export function AnnotationPanel({
 
   return (
     <div className="flex flex-col h-full bg-slate-900/30">
-      {/* Header */}
       <div className="p-4 border-b border-slate-800">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-white">Annotations</h2>
           <Badge variant="secondary">{annotations.length}</Badge>
         </div>
 
-        {/* Create Annotation Button */}
         <Button
           onClick={onCreateAnnotation}
           className="w-full"
@@ -235,7 +183,6 @@ export function AnnotationPanel({
         )}
       </div>
 
-      {/* Annotations List */}
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-3">
           {isLoading ? (
@@ -265,7 +212,6 @@ export function AnnotationPanel({
                   )
                 }
               >
-                {/* Annotation Header */}
                 <div className="flex items-start gap-2 mb-2">
                   <div
                     className="h-3 w-3 rounded-full mt-1 flex-shrink-0"
@@ -278,7 +224,6 @@ export function AnnotationPanel({
                   </div>
                 </div>
 
-                {/* Annotation Meta */}
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                   <span>{getUsername(annotation)}</span>
                   <span>{formatDate(annotation.createdAt)}</span>
@@ -286,7 +231,6 @@ export function AnnotationPanel({
 
                 <Separator className="my-2" />
 
-                {/* Annotation Actions */}
                 <div className="flex items-center gap-1">
                   <Button
                     size="sm"

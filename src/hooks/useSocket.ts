@@ -1,5 +1,7 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import socketManager from "@/lib/socket";
-import { tokenManager } from "@/services/api";
+import { tokenManager } from "@/services/api"; // Using your existing token manager
+import { env } from "@/config/env";
 import {
   ActiveUser,
   ClientToServerEvents,
@@ -13,34 +15,41 @@ import {
   ChatMessageEvent,
   TypingEvent,
 } from "@/types/socket.types";
-import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useSocket() {
   const [status, setStatus] = useState<SocketStatus>(socketManager.getStatus());
   const [isConnected, setIsConnected] = useState(socketManager.isConnected());
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Subscribe to status changes
     const unsubscribe = socketManager.onStatusChange((newStatus) => {
       setStatus(newStatus);
       setIsConnected(newStatus === "connected");
+      if (newStatus === "error") {
+        setError("Connection failed");
+      } else {
+        setError(null);
+      }
     });
 
-    // Connect if not connected (no auth required on connect)
     if (!socketManager.isConnected()) {
-      socketManager.connect();
-    } else {
-      setIsConnected(true);
+      socketManager.connect().catch((err) => {
+        console.error("Failed to connect socket:", err);
+        setError(err.message);
+      });
     }
 
-    // Cleanup
-    return () => {
-      unsubscribe();
-    };
+    return unsubscribe;
   }, []);
 
-  const connect = useCallback(() => {
-    socketManager.connect();
+  const connect = useCallback(async () => {
+    try {
+      setError(null);
+      await socketManager.connect();
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
+    }
   }, []);
 
   const disconnect = useCallback(() => {
@@ -50,54 +59,37 @@ export function useSocket() {
   return {
     status,
     isConnected,
+    error,
     connect,
     disconnect,
   };
 }
 
-/**
- * Socket Event Listener Hook
- * Generic hook for listening to socket events
- */
 export function useSocketEvent<K extends keyof ServerToClientEvents>(
   event: K,
   handler: ServerToClientEvents[K]
 ) {
   const handlerRef = useRef(handler);
 
-  // Update ref when handler changes
   useEffect(() => {
     handlerRef.current = handler;
   }, [handler]);
 
   useEffect(() => {
     const socket = socketManager.getSocket();
+    if (!socket) return;
 
-    if (!socket) {
-      console.warn(`Socket not available for event: ${String(event)}`);
-      return;
-    }
-
-    // Wrapper to always use latest handler
     const eventHandler = ((...args: any[]) => {
       handlerRef.current(...(args as any));
     }) as ServerToClientEvents[K];
 
     socketManager.on(event, eventHandler);
-
-    // Cleanup
-    return () => {
-      socketManager.off(event, eventHandler);
-    };
+    return () => socketManager.off(event, eventHandler);
   }, [event]);
 }
 
-/**
- * Socket Emit Hook
- * Provides type-safe emit function
- */
 export function useSocketEmit() {
-  const emit = useCallback(
+  return useCallback(
     <K extends keyof ClientToServerEvents>(
       event: K,
       ...args: Parameters<ClientToServerEvents[K]>
@@ -106,14 +98,8 @@ export function useSocketEmit() {
     },
     []
   );
-
-  return emit;
 }
 
-/**
- * Project Room Hook
- * Manages joining/leaving project rooms with proper authentication
- */
 export function useProjectRoom(projectId: string | null) {
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [isJoined, setIsJoined] = useState(false);
@@ -121,13 +107,16 @@ export function useProjectRoom(projectId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const { isConnected } = useSocket();
   const emit = useSocketEmit();
+  const joinAttemptedRef = useRef(false);
+  const currentProjectRef = useRef<string | null>(null);
 
-  /**
-   * Join project room (this is where authentication happens)
-   */
   const joinProject = useCallback(async () => {
-    if (!projectId || !isConnected) {
-      console.warn("Cannot join project: missing projectId or not connected");
+    if (
+      !projectId ||
+      !isConnected ||
+      joinAttemptedRef.current ||
+      currentProjectRef.current === projectId
+    ) {
       return;
     }
 
@@ -139,66 +128,58 @@ export function useProjectRoom(projectId: string | null) {
 
     setIsJoining(true);
     setError(null);
+    joinAttemptedRef.current = true;
+    currentProjectRef.current = projectId;
 
     const joinData: JoinProjectData = {
       projectId,
       token,
     };
 
-    console.log("PROHJEFT ID", joinData);
+    if (env.enableLogging) {
+      console.log("Joining project:", projectId);
+    }
 
-    // This is where authentication happens - backend verifies token
     emit("project:join", joinData, (response: JoinProjectResponse) => {
       if (response.success) {
         setActiveUsers(response.activeUsers || []);
         setIsJoined(true);
         setError(null);
-        console.log("Successfully joined project", projectId);
+        if (env.enableLogging) {
+          console.log("Successfully joined project", projectId);
+        }
       } else {
         setError(response.error || "Failed to join project");
         setIsJoined(false);
+        joinAttemptedRef.current = false;
+        currentProjectRef.current = null;
         console.error("Failed to join project:", response.error);
       }
       setIsJoining(false);
     });
   }, [projectId, isConnected, emit]);
 
-  /**
-   * Leave project room
-   */
   const leaveProject = useCallback(() => {
     if (!projectId || !isJoined) return;
 
     emit("project:leave", { projectId });
     setIsJoined(false);
     setActiveUsers([]);
+    joinAttemptedRef.current = false;
+    currentProjectRef.current = null;
   }, [projectId, isJoined, emit]);
 
-  /**
-   * Handle user joined event
-   */
   useSocketEvent(
     "project:user-joined",
     useCallback((data) => {
       setActiveUsers((prev) => {
-        // Check if user already exists
         const exists = prev.some((u) => u.userId === data.userId);
         if (exists) return prev;
-
-        return [
-          ...prev,
-          {
-            userId: data.userId,
-            username: data.username,
-          },
-        ];
+        return [...prev, { userId: data.userId, username: data.username }];
       });
     }, [])
   );
 
-  /**
-   * Handle user left event
-   */
   useSocketEvent(
     "project:user-left",
     useCallback((data) => {
@@ -206,25 +187,37 @@ export function useProjectRoom(projectId: string | null) {
     }, [])
   );
 
-  /**
-   * Auto-join when connected and projectId is available
-   */
   useEffect(() => {
-    if (isConnected && projectId && !isJoined && !isJoining) {
-      joinProject();
+    if (
+      isConnected &&
+      projectId &&
+      !isJoined &&
+      !isJoining &&
+      !joinAttemptedRef.current
+    ) {
+      const timer = setTimeout(() => {
+        joinProject();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isConnected, projectId, isJoined, isJoining, joinProject]);
 
-  /**
-   * Auto-leave on unmount or projectId change
-   */
+  useEffect(() => {
+    if (projectId !== currentProjectRef.current) {
+      setIsJoined(false);
+      setActiveUsers([]);
+      joinAttemptedRef.current = false;
+      setError(null);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     return () => {
-      if (isJoined && projectId) {
-        emit("project:leave", { projectId });
+      if (isJoined && currentProjectRef.current) {
+        emit("project:leave", { projectId: currentProjectRef.current });
       }
     };
-  }, [projectId, isJoined, emit]);
+  }, []);
 
   return {
     activeUsers,
@@ -236,21 +229,14 @@ export function useProjectRoom(projectId: string | null) {
   };
 }
 
-/**
- * Camera Sync Hook
- * Manages real-time camera synchronization with 3-second throttling
- */
 export function useCameraSync(
   projectId: string | null,
   onCameraUpdate?: (data: any) => void
 ) {
   const emit = useSocketEmit();
   const lastUpdateTime = useRef<number>(0);
-  const updateThrottle = 3000; // 3 seconds as requested
+  const updateThrottle = 3000;
 
-  /**
-   * Update camera state with throttling
-   */
   const updateCamera = useCallback(
     (cameraState: any) => {
       if (!projectId) return;
@@ -260,7 +246,7 @@ export function useCameraSync(
 
       const now = Date.now();
       if (now - lastUpdateTime.current < updateThrottle) {
-        return; // Skip update if within throttle period
+        return;
       }
 
       const cameraData: CameraUpdateData = {
@@ -270,15 +256,14 @@ export function useCameraSync(
         username: user.username,
       };
 
-      emit("camera:update", cameraData);
-      lastUpdateTime.current = now;
+      const success = emit("camera:update", cameraData);
+      if (success) {
+        lastUpdateTime.current = now;
+      }
     },
     [projectId, emit]
   );
 
-  /**
-   * Listen to camera updates from other users
-   */
   useSocketEvent(
     "camera:updated",
     useCallback(
@@ -291,23 +276,15 @@ export function useCameraSync(
     )
   );
 
-  return {
-    updateCamera,
-  };
+  return { updateCamera };
 }
 
-/**
- * Chat Hook
- * Manages real-time chat with proper message handling
- */
 export function useChat(projectId: string | null) {
   const [messages, setMessages] = useState<any[]>([]);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const emit = useSocketEmit();
+  const typingTimeoutRef = useRef<NodeJS.Timeout>(null);
 
-  /**
-   * Send message
-   */
   const sendMessage = useCallback(
     (message: string) => {
       if (!projectId || !message.trim()) return;
@@ -319,7 +296,9 @@ export function useChat(projectId: string | null) {
 
       emit("chat:message", messageData, (response: ChatMessageResponse) => {
         if (response.success) {
-          console.log("Message sent successfully");
+          if (env.enableLogging) {
+            console.log("Message sent successfully");
+          }
         } else {
           console.error("Failed to send message:", response.error);
         }
@@ -328,32 +307,31 @@ export function useChat(projectId: string | null) {
     [projectId, emit]
   );
 
-  /**
-   * Set typing status
-   */
   const setTyping = useCallback(
     (isTyping: boolean) => {
       if (!projectId) return;
 
       emit("chat:typing", { projectId, isTyping });
+
+      if (isTyping) {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+          emit("chat:typing", { projectId, isTyping: false });
+        }, 3000);
+      }
     },
     [projectId, emit]
   );
 
-  /**
-   * Listen to new messages
-   */
   useSocketEvent(
     "chat:message",
     useCallback((data: ChatMessageEvent) => {
-      // Add new message to state (backend sends full message object)
       setMessages((prev) => [...prev, data.message]);
     }, [])
   );
 
-  /**
-   * Listen to typing events
-   */
   useSocketEvent(
     "chat:typing",
     useCallback((data: TypingEvent) => {
@@ -369,13 +347,18 @@ export function useChat(projectId: string | null) {
     }, [])
   );
 
-  /**
-   * Clear messages when project changes
-   */
   useEffect(() => {
     setMessages([]);
     setTypingUsers(new Set());
   }, [projectId]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return {
     messages,
@@ -385,10 +368,6 @@ export function useChat(projectId: string | null) {
   };
 }
 
-/**
- * Annotation Sync Hook
- * Manages real-time annotation synchronization
- */
 export function useAnnotationSync(
   projectId: string | null,
   onAnnotationCreated?: (data: any) => void,
@@ -397,9 +376,6 @@ export function useAnnotationSync(
 ) {
   const emit = useSocketEmit();
 
-  /**
-   * Create annotation via socket
-   */
   const createAnnotation = useCallback(
     (annotationData: any, callback?: (response: any) => void) => {
       if (!projectId) return;
@@ -415,33 +391,22 @@ export function useAnnotationSync(
     [projectId, emit]
   );
 
-  /**
-   * Update annotation via socket
-   */
   const updateAnnotation = useCallback(
     (annotationId: string, updates: any) => {
       if (!projectId) return;
-
       emit("annotation:update", { projectId, annotationId, updates });
     },
     [projectId, emit]
   );
 
-  /**
-   * Delete annotation via socket
-   */
   const deleteAnnotation = useCallback(
     (annotationId: string) => {
       if (!projectId) return;
-
       emit("annotation:delete", { projectId, annotationId });
     },
     [projectId, emit]
   );
 
-  /**
-   * Listen to annotation events
-   */
   useSocketEvent(
     "annotation:created",
     useCallback(

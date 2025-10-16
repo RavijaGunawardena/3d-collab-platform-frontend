@@ -16,10 +16,6 @@ import { projectService } from "@/services/projectService";
 import { annotationService } from "@/services/annotationService";
 import { AnnotationMarkers } from "@/components/viewer/AnnotationMarkers";
 
-/**
- * Scene Component
- * Main 3D scene with models and annotations
- */
 function Scene({
   project,
   selectedModelId,
@@ -39,15 +35,10 @@ function Scene({
   selectedAnnotationId: string | null;
   onAnnotationClick: (annotation: Annotation) => void;
 }) {
-  /**
-   * Handle click on scene for annotation placement
-   */
   const handleSceneClick = (event: ThreeEvent<MouseEvent>) => {
     if (!isPlacingAnnotation) return;
 
     event.stopPropagation();
-
-    // Get the intersection point
     const point = event.point;
 
     onAnnotationPlaced({
@@ -59,12 +50,10 @@ function Scene({
 
   return (
     <group onClick={handleSceneClick}>
-      {/* Lighting */}
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
       <directionalLight position={[-10, -10, -5]} intensity={0.3} />
 
-      {/* Grid Helper */}
       <Grid
         args={[20, 20]}
         cellSize={1}
@@ -79,7 +68,6 @@ function Scene({
         infiniteGrid={false}
       />
 
-      {/* Render Models */}
       {project.models && project.models.length > 0 ? (
         project.models.map((model, index) => (
           <Model3D
@@ -91,14 +79,12 @@ function Scene({
           />
         ))
       ) : (
-        // Default cube if no models
         <mesh position={[0, 0.5, 0]} castShadow>
           <boxGeometry args={[1, 1, 1]} />
           <meshStandardMaterial color="#60a5fa" />
         </mesh>
       )}
 
-      {/* Annotation Markers */}
       <AnnotationMarkers
         annotations={annotations}
         selectedAnnotationId={selectedAnnotationId}
@@ -108,10 +94,6 @@ function Scene({
   );
 }
 
-/**
- * Model 3D Component
- * Renders individual 3D models with transform controls
- */
 function Model3D({
   model,
   isSelected,
@@ -126,11 +108,10 @@ function Model3D({
   const meshRef = useRef<THREE.Mesh>(null);
   const transformRef = useRef<any>(null);
   const lastUpdateTime = useRef<number>(0);
-  const updateThrottle = 3000; // 3 seconds throttle as requested
+  const updateThrottle = 3000;
 
   useEffect(() => {
     if (meshRef.current) {
-      // Apply transformations
       meshRef.current.position.set(
         model.position.x,
         model.position.y,
@@ -145,15 +126,12 @@ function Model3D({
     }
   }, [model]);
 
-  /**
-   * Handle transform end - save to backend with throttling
-   */
   const handleTransformEnd = async () => {
     if (!meshRef.current || !model._id) return;
 
     const now = Date.now();
     if (now - lastUpdateTime.current < updateThrottle) {
-      return; // Skip update if within throttle period
+      return;
     }
 
     try {
@@ -182,7 +160,6 @@ function Model3D({
     }
   };
 
-  // Render geometry based on type
   const renderGeometry = () => {
     if (model.type === "primitive" && model.geometry) {
       const { type: geometryType } = model.geometry;
@@ -229,7 +206,6 @@ function Model3D({
       }
     }
 
-    // Placeholder for uploaded models
     return (
       <>
         <boxGeometry args={[1, 1, 1]} />
@@ -248,7 +224,6 @@ function Model3D({
         {renderGeometry()}
       </mesh>
 
-      {/* Transform Controls (only for selected model) */}
       {isSelected && meshRef.current && (
         <TransformControls
           ref={transformRef}
@@ -261,10 +236,6 @@ function Model3D({
   );
 }
 
-/**
- * Camera Controller
- * Manages camera synchronization with 3-second throttling
- */
 function CameraController({
   projectId,
   initialCamera,
@@ -276,11 +247,9 @@ function CameraController({
   const controlsRef = useRef<any>(null);
 
   const { updateCamera } = useCameraSync(projectId, (data) => {
-    // Receive camera updates from other users
     console.log("Camera update from:", data.username);
   });
 
-  // Set initial camera position
   useEffect(() => {
     if (initialCamera && camera) {
       camera.position.set(
@@ -291,7 +260,6 @@ function CameraController({
     }
   }, [initialCamera, camera]);
 
-  // Handle camera changes with automatic throttling (handled in useCameraSync)
   const handleCameraChange = () => {
     if (controlsRef.current) {
       const target = controlsRef.current.target;
@@ -330,9 +298,6 @@ function CameraController({
   );
 }
 
-/**
- * Three Viewer Props
- */
 interface ThreeViewerProps {
   project: ProjectDisplay;
   selectedModelId: string | null;
@@ -340,10 +305,6 @@ interface ThreeViewerProps {
   onAnnotationPlaced: (position: Vector3) => void;
 }
 
-/**
- * Three Viewer Component
- * Main 3D canvas with Three.js rendering
- */
 export function ThreeViewer({
   project,
   selectedModelId,
@@ -356,18 +317,28 @@ export function ThreeViewer({
     string | null
   >(null);
 
-  /**
-   * Real-time annotation sync
-   */
   const { createAnnotation, updateAnnotation, deleteAnnotation } =
     useAnnotationSync(
       project.id,
       (data) => {
-        // Annotation created
-        setAnnotations((prev) => [...prev, data.annotation]);
+        const transformedAnnotation = {
+          id: data.annotation._id,
+          projectId: data.annotation.projectId,
+          modelId: data.annotation.modelId,
+          userId: data.annotation.userId,
+          username: data.annotation.username,
+          text: data.annotation.text,
+          position: data.annotation.position,
+          attachmentType: data.annotation.attachmentType,
+          style: data.annotation.style,
+          color: data.annotation.color,
+          visible: data.annotation.visible,
+          createdAt: new Date(data.annotation.createdAt),
+          updatedAt: new Date(data.annotation.updatedAt),
+        };
+        setAnnotations((prev) => [...prev, transformedAnnotation]);
       },
       (data) => {
-        // Annotation updated
         setAnnotations((prev) =>
           prev.map((ann) =>
             ann.id === data.annotationId ? { ...ann, ...data.updates } : ann
@@ -375,53 +346,58 @@ export function ThreeViewer({
         );
       },
       (data) => {
-        // Annotation deleted
         setAnnotations((prev) =>
           prev.filter((ann) => ann.id !== data.annotationId)
         );
+        if (selectedAnnotationId === data.annotationId) {
+          setSelectedAnnotationId(null);
+        }
       }
     );
 
-  /**
-   * Fetch annotations
-   */
   useEffect(() => {
     const fetchAnnotations = async () => {
       try {
         const data = await annotationService.getAnnotationsByProject(
           project.id
         );
-        setAnnotations(data);
+        const transformedAnnotations = data.map((annotation: any) => ({
+          id: annotation._id || annotation.id,
+          projectId: annotation.projectId,
+          modelId: annotation.modelId,
+          userId: annotation.userId,
+          username: annotation.username,
+          text: annotation.text,
+          position: annotation.position,
+          attachmentType: annotation.attachmentType,
+          style: annotation.style,
+          color: annotation.color,
+          visible: annotation.visible,
+          createdAt: new Date(annotation.createdAt),
+          updatedAt: new Date(annotation.updatedAt),
+        }));
+        setAnnotations(transformedAnnotations);
       } catch (error) {
         console.error("Failed to fetch annotations:", error);
       }
     };
 
     fetchAnnotations();
-
-    // Refresh annotations every 30 seconds (reduced frequency)
     const interval = setInterval(fetchAnnotations, 30000);
     return () => clearInterval(interval);
   }, [project.id]);
 
-  /**
-   * Handle annotation click
-   */
   const handleAnnotationClick = (annotation: Annotation) => {
     setSelectedAnnotationId(
       selectedAnnotationId === annotation.id ? null : annotation.id
     );
   };
 
-  /**
-   * Handle model update
-   */
   const handleModelUpdate = () => {
     // Trigger re-fetch in parent component
   };
 
   useEffect(() => {
-    // Check WebGL support
     if (!THREE.REVISION) {
       setError("Three.js failed to load");
       toast.error("3D Viewer Error", {
@@ -429,7 +405,6 @@ export function ThreeViewer({
       });
     }
 
-    // Change cursor when in placing mode
     if (isPlacingAnnotation) {
       document.body.style.cursor = "crosshair";
     } else {
@@ -463,7 +438,6 @@ export function ThreeViewer({
         }}
         dpr={[1, 2]}
       >
-        {/* Camera */}
         <PerspectiveCamera
           makeDefault
           position={[
@@ -474,13 +448,11 @@ export function ThreeViewer({
           fov={50}
         />
 
-        {/* Camera Controls */}
         <CameraController
           projectId={project.id}
           initialCamera={project.cameraState}
         />
 
-        {/* Scene */}
         <Scene
           project={project}
           selectedModelId={selectedModelId}

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ChatMessage, MessageType } from "@/types/chat.types";
 import { chatService } from "@/services/chatService";
 import { useChat } from "@/hooks/useSocket";
-import { useAuthStore } from "@/store/authStore";
+import { tokenManager } from "@/services/api";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,19 +13,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
-/**
- * Chat Panel Props
- */
 interface ChatPanelProps {
   projectId: string;
 }
 
-/**
- * Chat Panel Component
- * Real-time chat with message history
- */
 export function ChatPanel({ projectId }: ChatPanelProps) {
-  const { user } = useAuthStore();
+  const user = tokenManager.getUser();
   const [messageHistory, setMessageHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [messageInput, setMessageInput] = useState("");
@@ -40,9 +33,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     setTyping,
   } = useChat(projectId);
 
-  /**
-   * Fetch message history
-   */
+  // Fetch message history on component mount
   useEffect(() => {
     const fetchMessages = async () => {
       try {
@@ -60,23 +51,17 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     fetchMessages();
   }, [projectId]);
 
-  /**
-   * Merge realtime messages with history
-   */
+  // Combine message history with real-time messages
   const allMessages = [...messageHistory, ...realtimeMessages];
 
-  /**
-   * Auto-scroll to bottom when new messages arrive
-   */
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [allMessages.length]);
 
-  /**
-   * Handle send message
-   */
+  // Handle send message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -85,10 +70,10 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     try {
       setIsSending(true);
 
-      // Send via socket (real-time)
+      // Send via socket for real-time delivery
       sendMessage(messageInput.trim());
 
-      // Clear input and reset typing
+      // Clear input and stop typing indicator
       setMessageInput("");
       setTyping(false);
 
@@ -102,23 +87,13 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     }
   };
 
-  /**
-   * Handle typing indicator
-   */
+  // Handle typing indicator
   const handleInputChange = (value: string) => {
     setMessageInput(value);
-
-    // Emit typing status
-    if (value.length > 0) {
-      setTyping(true);
-    } else {
-      setTyping(false);
-    }
+    setTyping(value.length > 0);
   };
 
-  /**
-   * Format timestamp
-   */
+  // Format timestamp for display
   const formatTime = (date: Date | string): string => {
     return new Date(date).toLocaleTimeString("en-US", {
       hour: "2-digit",
@@ -126,9 +101,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     });
   };
 
-  /**
-   * Get initials for avatar
-   */
+  // Get initials for avatar
   const getInitials = (username: string): string => {
     return username
       .split(" ")
@@ -138,9 +111,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
       .slice(0, 2);
   };
 
-  /**
-   * Get message type styling
-   */
+  // Get message type styling
   const getMessageStyle = (type: MessageType) => {
     switch (type) {
       case "system":
@@ -152,9 +123,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     }
   };
 
-  /**
-   * Get username from message
-   */
+  // Extract username from message object
   const getMessageUsername = (message: any): string => {
     // Handle populated user object
     if (message.userId && typeof message.userId === "object") {
@@ -167,15 +136,14 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     return "Unknown";
   };
 
-  /**
-   * Render message
-   */
+  // Render individual message
   const renderMessage = (message: any, index: number) => {
     const type = message.type || "text";
     const username = getMessageUsername(message);
     const text = message.message;
     const timestamp = message.createdAt;
 
+    // Render system/notification messages differently
     if (type === "system" || type === "notification") {
       return (
         <div
@@ -192,19 +160,20 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     return (
       <div
         key={message._id || index}
-        className={`flex gap-3 px-4 py-2 hover:bg-slate-800/30 ${
+        className={`flex gap-3 px-4 py-2 hover:bg-slate-800/30 transition-colors ${
           isOwnMessage ? "flex-row-reverse" : ""
         }`}
       >
         {/* Avatar */}
         <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarFallback className="text-xs">
+          <AvatarFallback className="text-xs bg-slate-700 text-slate-200">
             {getInitials(username)}
           </AvatarFallback>
         </Avatar>
 
         {/* Message Content */}
         <div className={`flex-1 min-w-0 ${isOwnMessage ? "text-right" : ""}`}>
+          {/* Message Header */}
           <div className="flex items-baseline gap-2 mb-1">
             {!isOwnMessage && (
               <>
@@ -226,8 +195,9 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
             )}
           </div>
 
+          {/* Message Bubble */}
           <div
-            className={`inline-block px-3 py-2 rounded-lg text-sm ${
+            className={`inline-block px-3 py-2 rounded-lg text-sm max-w-xs break-words ${
               isOwnMessage
                 ? "bg-primary text-primary-foreground"
                 : "bg-slate-800 text-slate-100"
@@ -241,7 +211,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/30">
+    <div className="flex flex-col h-full bg-slate-900/30 border-l border-slate-800">
       {/* Header */}
       <div className="p-4 border-b border-slate-800">
         <div className="flex items-center justify-between">
@@ -249,6 +219,11 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
             <MessageCircle className="h-5 w-5" />
             Chat
           </h2>
+          {allMessages.length > 0 && (
+            <span className="text-xs text-slate-400">
+              {allMessages.length} messages
+            </span>
+          )}
         </div>
       </div>
 
@@ -257,6 +232,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <span className="ml-2 text-slate-400">Loading messages...</span>
           </div>
         ) : allMessages.length === 0 ? (
           <div className="text-center py-12 text-slate-400 px-4">
@@ -265,7 +241,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
             <p className="text-xs mt-1">Start the conversation!</p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-1 pb-4">
             {allMessages.map((msg, index) => renderMessage(msg, index))}
             <div ref={scrollRef} />
           </div>
@@ -274,7 +250,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
 
       {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="px-4 py-2 text-xs text-slate-400 italic">
+        <div className="px-4 py-2 text-xs text-slate-400 italic border-t border-slate-800/50">
           {typingUsers.length === 1
             ? `${typingUsers[0]} is typing...`
             : typingUsers.length === 2
@@ -283,36 +259,40 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
         </div>
       )}
 
-      <Separator />
-
       {/* Input Area */}
-      <div className="p-4">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder="Type a message..."
-            value={messageInput}
-            onChange={(e) => handleInputChange(e.target.value)}
-            disabled={isSending}
-            className="flex-1 bg-slate-800 border-slate-700 focus:border-slate-600"
-            maxLength={1000}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!messageInput.trim() || isSending}
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-        <p className="text-xs text-slate-500 mt-2">
-          Press Enter to send • {messageInput.length}/1000
-        </p>
+      <div className="border-t border-slate-800">
+        <div className="p-4">
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Type a message..."
+              value={messageInput}
+              onChange={(e) => handleInputChange(e.target.value)}
+              disabled={isSending}
+              className="flex-1 bg-slate-800 border-slate-700 focus:border-slate-600 text-white placeholder-slate-400"
+              maxLength={1000}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!messageInput.trim() || isSending}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {isSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
+
+          {/* Character Count */}
+          <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+            <span>Press Enter to send</span>
+            <span>{messageInput.length}/1000</span>
+          </div>
+        </div>
       </div>
     </div>
   );
