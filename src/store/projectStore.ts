@@ -2,8 +2,8 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { projectService } from "@/services/projectService";
 import {
-  Project,
-  ProjectListItem,
+  ProjectDisplay,
+  ProjectListItemDisplay,
   CreateProjectInput,
   UpdateProjectInput,
   QueryProjectsInput,
@@ -15,15 +15,16 @@ import { env } from "@/config/env";
  */
 interface ProjectState {
   // State
-  projects: ProjectListItem[];
-  currentProject: Project | null;
+  projects: ProjectListItemDisplay[];
+  myProjects: ProjectListItemDisplay[]; // Store user's projects separately
+  currentProject: ProjectDisplay | null;
   isLoading: boolean;
   isCreating: boolean;
   isUpdating: boolean;
   isDeleting: boolean;
   error: string | null;
 
-  // Pagination
+  // Pagination (for all projects view)
   currentPage: number;
   totalPages: number;
   totalProjects: number;
@@ -32,18 +33,22 @@ interface ProjectState {
   // Search
   searchQuery: string;
 
+  // View state
+  currentView: "all" | "my"; // Track current view
+
   // Actions - Projects List
   fetchProjects: (query?: QueryProjectsInput) => Promise<void>;
   fetchMyProjects: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   setPage: (page: number) => void;
+  setView: (view: "all" | "my") => void;
 
   // Actions - Single Project
   fetchProjectById: (projectId: string) => Promise<void>;
-  setCurrentProject: (project: Project | null) => void;
+  setCurrentProject: (project: ProjectDisplay | null) => void;
 
   // Actions - CRUD
-  createProject: (data: CreateProjectInput) => Promise<Project>;
+  createProject: (data: CreateProjectInput) => Promise<ProjectDisplay>;
   updateProject: (projectId: string, data: UpdateProjectInput) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
 
@@ -57,6 +62,7 @@ interface ProjectState {
  */
 const initialState = {
   projects: [],
+  myProjects: [],
   currentProject: null,
   isLoading: false,
   isCreating: false,
@@ -68,11 +74,12 @@ const initialState = {
   totalProjects: 0,
   limit: 20,
   searchQuery: "",
+  currentView: "all" as const,
 };
 
 /**
  * Project Store
- * Global state management for projects
+ * Global state management for projects with proper type handling
  */
 export const useProjectStore = create<ProjectState>()(
   devtools(
@@ -84,7 +91,7 @@ export const useProjectStore = create<ProjectState>()(
        */
       fetchProjects: async (query?: QueryProjectsInput) => {
         try {
-          set({ isLoading: true, error: null });
+          set({ isLoading: true, error: null, currentView: "all" });
 
           const { searchQuery, currentPage, limit } = get();
 
@@ -119,19 +126,23 @@ export const useProjectStore = create<ProjectState>()(
        */
       fetchMyProjects: async () => {
         try {
-          set({ isLoading: true, error: null });
+          set({ isLoading: true, error: null, currentView: "my" });
 
           const projects = await projectService.getMyProjects();
 
           set({
-            projects,
+            myProjects: projects,
+            projects: projects, // Also update projects for unified display
             totalProjects: projects.length,
+            totalPages: 1, // No pagination for my projects
+            currentPage: 1,
             isLoading: false,
             error: null,
           });
         } catch (error: any) {
           console.error("Failed to fetch my projects:", error);
           set({
+            myProjects: [],
             projects: [],
             isLoading: false,
             error: error.message || "Failed to fetch your projects",
@@ -167,33 +178,42 @@ export const useProjectStore = create<ProjectState>()(
       /**
        * Set current project manually
        */
-      setCurrentProject: (project: Project | null) => {
+      setCurrentProject: (project: ProjectDisplay | null) => {
         set({ currentProject: project });
       },
 
       /**
        * Create new project
        */
-      createProject: async (data: CreateProjectInput): Promise<Project> => {
+      createProject: async (
+        data: CreateProjectInput
+      ): Promise<ProjectDisplay> => {
         try {
           set({ isCreating: true, error: null });
 
           const project = await projectService.createProject(data);
 
-          // Add to projects list
-          const { projects } = get();
+          // Convert ProjectDisplay to ProjectListItemDisplay for list views
+          const newProjectItem: ProjectListItemDisplay = {
+            id: project.id,
+            title: project.title,
+            description: project.description,
+            modelCount: project.models?.length || 0,
+            createdBy: project.createdBy,
+            createdAt: project.createdAt,
+          };
+
+          // Update both all projects and my projects lists
+          const { projects, myProjects, currentView } = get();
+
           set({
-            projects: [
-              {
-                id: project.id,
-                title: project.title,
-                description: project.description,
-                modelCount: project.models?.length || 0,
-                createdBy: project.createdBy,
-                createdAt: project.createdAt,
-              },
-              ...projects,
-            ],
+            // Add to all projects if in all view, otherwise keep existing
+            projects:
+              currentView === "all"
+                ? [newProjectItem, ...projects]
+                : [newProjectItem, ...projects],
+            // Always add to my projects
+            myProjects: [newProjectItem, ...myProjects],
             totalProjects: get().totalProjects + 1,
             isCreating: false,
             error: null,
@@ -217,17 +237,26 @@ export const useProjectStore = create<ProjectState>()(
         try {
           set({ isUpdating: true, error: null });
 
-          await projectService.updateProject(projectId, data);
+          const updatedProject = await projectService.updateProject(
+            projectId,
+            data
+          );
 
-          // Update in projects list
-          const { projects, currentProject } = get();
-          set({
-            projects: projects.map((p) =>
+          const updateProjectInList = (
+            projectsList: ProjectListItemDisplay[]
+          ) =>
+            projectsList.map((p) =>
               p.id === projectId ? { ...p, ...data } : p
-            ),
+            );
+
+          // Update in both lists and current project
+          const { projects, myProjects, currentProject } = get();
+          set({
+            projects: updateProjectInList(projects),
+            myProjects: updateProjectInList(myProjects),
             currentProject:
               currentProject?.id === projectId
-                ? { ...currentProject, ...data }
+                ? updatedProject
                 : currentProject,
             isUpdating: false,
             error: null,
@@ -251,13 +280,18 @@ export const useProjectStore = create<ProjectState>()(
 
           await projectService.deleteProject(projectId);
 
-          // Remove from projects list
-          const { projects, currentProject } = get();
+          const removeProjectFromList = (
+            projectsList: ProjectListItemDisplay[]
+          ) => projectsList.filter((p) => p.id !== projectId);
+
+          // Remove from both lists and current project
+          const { projects, myProjects, currentProject } = get();
           set({
-            projects: projects.filter((p) => p.id !== projectId),
+            projects: removeProjectFromList(projects),
+            myProjects: removeProjectFromList(myProjects),
             currentProject:
               currentProject?.id === projectId ? null : currentProject,
-            totalProjects: get().totalProjects - 1,
+            totalProjects: Math.max(0, get().totalProjects - 1),
             isDeleting: false,
             error: null,
           });
@@ -272,19 +306,47 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       /**
-       * Set search query and fetch projects
+       * Set search query and fetch projects based on current view
        */
       setSearchQuery: (query: string) => {
         set({ searchQuery: query, currentPage: 1 });
-        get().fetchProjects({ page: 1, search: query });
+
+        const { currentView } = get();
+        if (currentView === "all") {
+          get().fetchProjects({ page: 1, search: query });
+        } else {
+          // For "my" view, we don't need to refetch as we have all data locally
+          // The filtering will be handled in the component
+        }
       },
 
       /**
-       * Set current page and fetch projects
+       * Set current page and fetch projects (only for all projects view)
        */
       setPage: (page: number) => {
         set({ currentPage: page });
-        get().fetchProjects({ page });
+
+        const { currentView } = get();
+        if (currentView === "all") {
+          get().fetchProjects({ page });
+        }
+      },
+
+      /**
+       * Set current view
+       */
+      setView: (view: "all" | "my") => {
+        set({ currentView: view });
+
+        // Reset search and pagination when switching views
+        set({ searchQuery: "", currentPage: 1 });
+
+        // Fetch appropriate data
+        if (view === "all") {
+          get().fetchProjects();
+        } else {
+          get().fetchMyProjects();
+        }
       },
 
       /**
@@ -314,9 +376,11 @@ export const useProjectStore = create<ProjectState>()(
  */
 export const projectSelectors = {
   projects: (state: ProjectState) => state.projects,
+  myProjects: (state: ProjectState) => state.myProjects,
   currentProject: (state: ProjectState) => state.currentProject,
   isLoading: (state: ProjectState) => state.isLoading,
   error: (state: ProjectState) => state.error,
+  currentView: (state: ProjectState) => state.currentView,
   pagination: (state: ProjectState) => ({
     currentPage: state.currentPage,
     totalPages: state.totalPages,

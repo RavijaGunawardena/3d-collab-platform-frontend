@@ -4,10 +4,10 @@ import { ArrowLeft, Users, Loader2, MessageCircle, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 import { useProjectStore } from "@/store/projectStore";
-import { useAuthStore } from "@/store/authStore";
+// import { useAuthStore } from "@/store/authStore";
 import { useSocket, useProjectRoom } from "@/hooks/useSocket";
 import { Annotation } from "@/types/annotation.types";
-import { Vector3 } from "@/types/project.types";
+import { Vector3, getUserDisplayName } from "@/types/project.types";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -24,14 +24,13 @@ import { ChatPanel } from "@/components/viewer/ChatPanel";
 export function ProjectViewerPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore();
   const { currentProject, fetchProjectById, isLoading } = useProjectStore();
   const { isConnected } = useSocket();
   const { activeUsers, isJoined, isJoining } = useProjectRoom(
     projectId || null
   );
 
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] =
     useState<Annotation | null>(null);
@@ -93,16 +92,6 @@ export function ProjectViewerPage() {
     navigate("/");
   };
 
-  /**
-   * Get creator username
-   */
-  const getCreatorUsername = (createdBy: any): string => {
-    if (typeof createdBy === "string") {
-      return "Unknown";
-    }
-    return createdBy?.username || "Unknown";
-  };
-
   // Loading state
   if (isLoading || !currentProject) {
     return (
@@ -139,7 +128,7 @@ export function ProjectViewerPage() {
               {currentProject.title}
             </h1>
             <p className="text-xs text-slate-400 truncate">
-              Created by {getCreatorUsername(currentProject.createdBy)}
+              Created by {getUserDisplayName(currentProject.createdBy)}
             </p>
           </div>
 

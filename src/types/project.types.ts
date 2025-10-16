@@ -37,11 +37,11 @@ export interface GeometryParameters {
 }
 
 /**
- * 3D Model Interface
+ * 3D Model Interface (Backend Response Format)
  * Represents a 3D object in the project
  */
 export interface Model3D {
-  _id?: string;
+  _id?: string; // Backend uses _id
   name: string;
   type: ModelType;
   geometry?: {
@@ -56,48 +56,64 @@ export interface Model3D {
   scale: Vector3;
   color?: string;
   visible: boolean;
-  createdAt: Date;
+  createdAt: string; // Backend sends ISO string
 }
 
 /**
- * Project Interface
+ * User Info Interface (for populated createdBy field)
+ */
+export interface UserInfo {
+  _id: string; // Backend uses _id
+  username: string;
+  id?: string; // Some responses might include this
+}
+
+/**
+ * Project Interface (Backend Response Format)
  * Represents a 3D collaborative project
  */
 export interface Project {
-  id: string;
+  _id: string; // Backend uses _id
+  id: string; // Transformed frontend field
   title: string;
   description?: string;
-  createdBy:
-    | string
-    | {
-        _id: string;
-        username: string;
-        id: string;
-      };
+  createdBy: string | UserInfo; // Can be ObjectId string or populated user
   models: Model3D[];
   cameraState: CameraState;
-  activeUsers: string[];
-  modelCount?: number;
+  activeUsers: string[]; // Array of user IDs
+  modelCount?: number; // Virtual field from backend
+  createdAt: string; // Backend sends ISO string
+  updatedAt: string; // Backend sends ISO string
+}
+
+/**
+ * Project List Item Interface (Backend Response Format)
+ * Simplified project data for list views (matches backend controller response)
+ */
+export interface ProjectListItem {
+  id: string; // Backend transforms _id to id in controller
+  title: string;
+  description?: string;
+  modelCount: number;
+  createdBy: string | UserInfo; // Can be string ID or populated user object
+  createdAt: string; // Backend sends ISO string
+}
+
+/**
+ * Frontend Project Interface (for UI display)
+ * Project with Date objects for easier manipulation
+ */
+export interface ProjectDisplay
+  extends Omit<Project, "createdAt" | "updatedAt"> {
   createdAt: Date;
   updatedAt: Date;
 }
 
 /**
- * Project List Item Interface
- * Simplified project data for list views
+ * Frontend Project List Item (for UI display)
  */
-export interface ProjectListItem {
-  id: string;
-  title: string;
-  description?: string;
-  modelCount: number;
-  createdBy:
-    | string
-    | {
-        _id: string;
-        username: string;
-        id: string
-      };
+export interface ProjectListItemDisplay
+  extends Omit<ProjectListItem, "createdAt"> {
   createdAt: Date;
 }
 
@@ -170,10 +186,36 @@ export interface QueryProjectsInput {
 }
 
 /**
- * Paginated Projects Response
+ * Backend API Response Interface (matches ApiResponse.util.ts)
+ */
+export interface BackendApiResponse<T = any> {
+  status: "success" | "error";
+  message?: string;
+  data?: T;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+  timestamp: string;
+}
+
+/**
+ * Backend Paginated Response (matches backend controller response)
+ */
+export interface BackendPaginatedResponse {
+  projects: ProjectListItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+/**
+ * Frontend Paginated Projects Response (for UI)
  */
 export interface PaginatedProjectsResponse {
-  projects: ProjectListItem[];
+  projects: ProjectListItemDisplay[];
   total: number;
   page: number;
   totalPages: number;
@@ -206,3 +248,89 @@ export const DEFAULT_SCALE: Vector3 = {
   y: 1,
   z: 1,
 };
+
+/**
+ * Utility functions for data transformation
+ */
+
+/**
+ * Transform backend project to frontend project
+ */
+export function transformProject(backendProject: Project): ProjectDisplay {
+  return {
+    ...backendProject,
+    createdAt: new Date(backendProject.createdAt),
+    updatedAt: new Date(backendProject.updatedAt),
+  };
+}
+
+/**
+ * Transform backend project list item to frontend format
+ */
+export function transformProjectListItem(
+  backendItem: ProjectListItem
+): ProjectListItemDisplay {
+  return {
+    ...backendItem,
+    createdAt: new Date(backendItem.createdAt),
+  };
+}
+
+/**
+ * Transform backend projects array to frontend format
+ */
+export function transformProjectsList(
+  backendProjects: ProjectListItem[]
+): ProjectListItemDisplay[] {
+  return backendProjects.map(transformProjectListItem);
+}
+
+/**
+ * Type guards for better type safety
+ */
+export function isUserInfo(
+  createdBy: string | UserInfo | null
+): createdBy is UserInfo {
+  return (
+    createdBy !== null &&
+    typeof createdBy === "object" &&
+    "username" in createdBy
+  );
+}
+
+export function isStringId(
+  createdBy: string | UserInfo | null
+): createdBy is string {
+  return typeof createdBy === "string";
+}
+
+/**
+ * Get user display name from createdBy field
+ */
+export function getUserDisplayName(
+  createdBy: string | UserInfo | null
+): string {
+  if (createdBy === null) {
+    return "Unknown";
+  }
+  if (typeof createdBy === "string") {
+    return "Unknown"; // We only have ID, not username
+  }
+  return createdBy?.username || "Unknown";
+}
+
+/**
+ * Check if user is the creator of a project
+ */
+export function isProjectCreator(
+  createdBy: string | UserInfo | null,
+  currentUserId: string | null
+): boolean {
+  if (!currentUserId || createdBy === null) return false;
+
+  if (typeof createdBy === "string") {
+    return createdBy === currentUserId;
+  }
+
+  return createdBy?._id === currentUserId || createdBy?.id === currentUserId;
+}

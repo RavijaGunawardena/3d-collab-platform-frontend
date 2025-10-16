@@ -3,39 +3,50 @@ import {
   CreateProjectInput,
   PaginatedProjectsResponse,
   Project,
+  ProjectDisplay,
   ProjectListItem,
+  ProjectListItemDisplay,
   QueryProjectsInput,
   UpdateCameraInput,
   UpdateModelInput,
   UpdateProjectInput,
+  BackendApiResponse,
+  transformProject,
+  transformProjectsList,
 } from "@/types/project.types";
-import api from "./api";
+import { apiClient } from "./api";
 import { apiEndpoints } from "@/config/env";
 
 /**
  * Project Service
- * Handles all project-related API calls
+ * Handles all project-related API calls with proper type transformations
  */
 class ProjectService {
   /**
    * Create a new project
    *
    * @param data - Project creation data
-   * @returns Created project
+   * @returns Created project with transformed types
    */
-  async createProject(data: CreateProjectInput): Promise<Project> {
-    const response = await api.post<Project>(
+  async createProject(data: CreateProjectInput): Promise<ProjectDisplay> {
+    const response = await apiClient.post<BackendApiResponse<Project>>(
       apiEndpoints.projects.create,
       data
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("No project data received from server");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 
   /**
    * Get all projects with pagination
    *
    * @param query - Query parameters (page, limit, search)
-   * @returns Paginated projects
+   * @returns Paginated projects with transformed types
    */
   async getAllProjects(
     query?: QueryProjectsInput
@@ -46,36 +57,59 @@ class ProjectService {
     if (query?.limit) params.append("limit", query.limit.toString());
     if (query?.search) params.append("search", query.search);
 
-    const response = await api.get<PaginatedProjectsResponse>(
+    const response = await apiClient.get<BackendApiResponse<ProjectListItem[]>>(
       `${apiEndpoints.projects.list}?${params.toString()}`
     );
 
-    return response;
+    // Extract data and meta from the API response
+    const { data: projects = [], meta } = response.data;
+
+    // Transform projects to frontend format with Date objects
+    const transformedProjects = transformProjectsList(projects);
+
+    return {
+      projects: transformedProjects,
+      total: meta?.total || 0,
+      page: meta?.page || 1,
+      totalPages: meta?.totalPages || 1,
+    };
   }
 
   /**
    * Get projects created by current user
    *
-   * @returns User's projects
+   * @returns User's projects with transformed types
    */
-  async getMyProjects(): Promise<ProjectListItem[]> {
-    const response = await api.get<ProjectListItem[]>(
+  async getMyProjects(): Promise<ProjectListItemDisplay[]> {
+    const response = await apiClient.get<BackendApiResponse<ProjectListItem[]>>(
       apiEndpoints.projects.myProjects
     );
-    return response;
+
+    if (!response.data.data) {
+      return [];
+    }
+
+    // Transform to frontend format
+    return transformProjectsList(response.data.data);
   }
 
   /**
    * Get project by ID
    *
    * @param projectId - Project ID
-   * @returns Project details
+   * @returns Project details with transformed types
    */
-  async getProjectById(projectId: string): Promise<Project> {
-    const response = await api.get<Project>(
+  async getProjectById(projectId: string): Promise<ProjectDisplay> {
+    const response = await apiClient.get<BackendApiResponse<Project>>(
       apiEndpoints.projects.detail(projectId)
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("Project not found");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 
   /**
@@ -83,17 +117,23 @@ class ProjectService {
    *
    * @param projectId - Project ID
    * @param data - Update data
-   * @returns Updated project
+   * @returns Updated project with transformed types
    */
   async updateProject(
     projectId: string,
     data: UpdateProjectInput
-  ): Promise<Project> {
-    const response = await api.put<Project>(
+  ): Promise<ProjectDisplay> {
+    const response = await apiClient.put<BackendApiResponse<Project>>(
       apiEndpoints.projects.update(projectId),
       data
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("No project data received from server");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 
   /**
@@ -102,7 +142,7 @@ class ProjectService {
    * @param projectId - Project ID
    */
   async deleteProject(projectId: string): Promise<void> {
-    await api.delete<void>(apiEndpoints.projects.delete(projectId));
+    await apiClient.delete(apiEndpoints.projects.delete(projectId));
   }
 
   /**
@@ -110,17 +150,23 @@ class ProjectService {
    *
    * @param projectId - Project ID
    * @param modelData - Model data
-   * @returns Updated project with new model
+   * @returns Updated project with new model and transformed types
    */
   async addModel(
     projectId: string,
     modelData: AddModelInput
-  ): Promise<Project> {
-    const response = await api.post<Project>(
+  ): Promise<ProjectDisplay> {
+    const response = await apiClient.post<BackendApiResponse<Project>>(
       apiEndpoints.projects.addModel(projectId),
       modelData
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("No project data received from server");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 
   /**
@@ -129,18 +175,24 @@ class ProjectService {
    * @param projectId - Project ID
    * @param modelId - Model ID
    * @param updates - Model updates
-   * @returns Updated project
+   * @returns Updated project with transformed types
    */
   async updateModel(
     projectId: string,
     modelId: string,
     updates: Omit<UpdateModelInput, "modelId">
-  ): Promise<Project> {
-    const response = await api.put<Project>(
+  ): Promise<ProjectDisplay> {
+    const response = await apiClient.put<BackendApiResponse<Project>>(
       apiEndpoints.projects.updateModel(projectId, modelId),
       { modelId, ...updates }
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("No project data received from server");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 
   /**
@@ -148,13 +200,22 @@ class ProjectService {
    *
    * @param projectId - Project ID
    * @param modelId - Model ID
-   * @returns Updated project without the model
+   * @returns Updated project without the model and transformed types
    */
-  async deleteModel(projectId: string, modelId: string): Promise<Project> {
-    const response = await api.delete<Project>(
+  async deleteModel(
+    projectId: string,
+    modelId: string
+  ): Promise<ProjectDisplay> {
+    const response = await apiClient.delete<BackendApiResponse<Project>>(
       apiEndpoints.projects.deleteModel(projectId, modelId)
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("No project data received from server");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 
   /**
@@ -162,17 +223,23 @@ class ProjectService {
    *
    * @param projectId - Project ID
    * @param cameraState - Camera state updates
-   * @returns Updated project with new camera state
+   * @returns Updated project with new camera state and transformed types
    */
   async updateCamera(
     projectId: string,
     cameraState: UpdateCameraInput
-  ): Promise<Project> {
-    const response = await api.patch<Project>(
+  ): Promise<ProjectDisplay> {
+    const response = await apiClient.patch<BackendApiResponse<Project>>(
       apiEndpoints.projects.addCamera(projectId),
       cameraState
     );
-    return response;
+
+    if (!response.data.data) {
+      throw new Error("No project data received from server");
+    }
+
+    // Transform backend response to frontend format
+    return transformProject(response.data.data);
   }
 }
 

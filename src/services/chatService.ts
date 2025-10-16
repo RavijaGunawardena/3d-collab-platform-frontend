@@ -1,98 +1,76 @@
-import { api } from "@/services/api";
 import {
   ChatMessage,
   SendMessageInput,
   GetMessagesInput,
 } from "@/types/chat.types";
+import { BackendApiResponse } from "@/types/project.types";
+import { apiClient } from "./api";
+import { apiEndpoints } from "@/config/env";
 
 /**
  * Chat Service
- * Handles all chat-related API calls
+ * Handles all chat-related API calls to match backend structure
  */
 class ChatService {
   /**
-   * Send a chat message
-   *
-   * @param data - Message data
-   * @returns Created message
+   * Send a new message
    */
   async sendMessage(data: SendMessageInput): Promise<ChatMessage> {
-    const response = await api.post<ChatMessage>("/chat/messages", data);
-    return response;
-  }
-
-  /**
-   * Get messages for a project
-   *
-   * @param projectId - Project ID
-   * @param query - Query parameters
-   * @returns Array of messages
-   */
-  async getMessages(
-    projectId: string,
-    query?: Omit<GetMessagesInput, "projectId">
-  ): Promise<ChatMessage[]> {
-    const params = new URLSearchParams();
-
-    if (query?.limit) params.append("limit", query.limit.toString());
-    if (query?.skip) params.append("skip", query.skip.toString());
-    if (query?.type) params.append("type", query.type);
-
-    const response = await api.get<ChatMessage[]>(
-      `/chat/projects/${projectId}/messages?${params.toString()}`
+    const response = await apiClient.post<BackendApiResponse<ChatMessage>>(
+      apiEndpoints.chat.send,
+      data
     );
 
-    return response;
+    if (!response.data.data) {
+      throw new Error("No message data received from server");
+    }
+
+    return response.data.data;
   }
 
   /**
    * Get recent messages for a project
-   *
-   * @param projectId - Project ID
-   * @param limit - Number of messages to retrieve
-   * @returns Array of recent messages
    */
   async getRecentMessages(
     projectId: string,
     limit: number = 50
   ): Promise<ChatMessage[]> {
-    const response = await api.get<ChatMessage[]>(
-      `/chat/projects/${projectId}/recent?limit=${limit}`
+
+    console.log("PROJECTID", projectId)
+
+    const response = await apiClient.get<BackendApiResponse<ChatMessage[]>>(
+      `${apiEndpoints.chat.recentMessages(projectId)}?limit=${limit}`
     );
 
-    return response;
+    return response.data.data || [];
   }
 
   /**
-   * Count messages for a project
-   *
-   * @param projectId - Project ID
-   * @returns Message count
+   * Get messages with pagination and filtering
    */
-  async countMessages(projectId: string): Promise<number> {
-    const response = await api.get<{ count: number }>(
-      `/chat/projects/${projectId}/count`
+  async getMessages(query: GetMessagesInput): Promise<ChatMessage[]> {
+    const params = new URLSearchParams();
+
+    if (query.limit) params.append("limit", query.limit.toString());
+    if (query.skip) params.append("skip", query.skip.toString());
+    if (query.type) params.append("type", query.type);
+
+    const response = await apiClient.get<BackendApiResponse<ChatMessage[]>>(
+      `${apiEndpoints.chat.messages(query.projectId)}?${params.toString()}`
     );
 
-    return response.count;
+    return response.data.data || [];
   }
 
   /**
-   * Cleanup old messages (keep last N messages)
-   *
-   * @param projectId - Project ID
-   * @param keepLast - Number of messages to keep
-   * @returns Number of deleted messages
+   * Get message count for a project
    */
-  async cleanupMessages(
-    projectId: string,
-    keepLast: number = 1000
-  ): Promise<number> {
-    const response = await api.delete<{ deletedCount: number }>(
-      `/chat/projects/${projectId}/cleanup?keepLast=${keepLast}`
+  async getMessageCount(projectId: string): Promise<number> {
+    const response = await apiClient.get<BackendApiResponse<{ count: number }>>(
+      `${apiEndpoints.chat.count(projectId)}/${projectId}`
     );
 
-    return response.deletedCount;
+    return response.data.data?.count || 0;
   }
 }
 

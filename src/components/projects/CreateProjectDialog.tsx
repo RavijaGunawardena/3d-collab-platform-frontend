@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -21,25 +20,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-/**
- * Create Project Form Schema
- * Matches backend validation
- */
-const createProjectSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(2, "Title must be at least 2 characters")
-    .max(100, "Title must be at most 100 characters"),
-  description: z
-    .string()
-    .trim()
-    .max(500, "Description must be at most 500 characters")
-    .optional(),
-});
-
-type CreateProjectFormData = z.infer<typeof createProjectSchema>;
+import {
+  CreateProjectFormInput,
+  createProjectSchema,
+} from "@/validators/projectValidator";
 
 /**
  * Create Project Dialog Props
@@ -67,7 +51,7 @@ export function CreateProjectDialog({
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm<CreateProjectFormData>({
+  } = useForm<CreateProjectFormInput>({
     resolver: zodResolver(createProjectSchema),
     mode: "onBlur",
   });
@@ -75,7 +59,7 @@ export function CreateProjectDialog({
   /**
    * Handle form submission
    */
-  const onSubmit = async (data: CreateProjectFormData) => {
+  const onSubmit = async (data: CreateProjectFormInput) => {
     try {
       setIsSubmitting(true);
 

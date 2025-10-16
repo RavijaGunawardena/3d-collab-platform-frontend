@@ -1,30 +1,43 @@
 /**
- * Message Type
- * Different types of chat messages
+ * Message Type (matches backend exactly)
  */
 export type MessageType = "text" | "system" | "notification";
 
 /**
- * Chat Message Interface
- * Represents a message in the chat
+ * Chat Message Interface (matches backend IChatMessage)
  */
 export interface ChatMessage {
-  id: string;
+  _id: string; // Backend uses _id
+  id?: string; // Frontend transformed field
   projectId: string;
-  userId?: string;
-  username?: string;
+  userId?:
+    | string
+    | {
+        _id: string;
+        username: string;
+      };
+  username?: string; // Fallback field
   message: string;
   type: MessageType;
   metadata?: {
     action?: string;
     [key: string]: any;
   };
+  createdAt: string; // Backend sends ISO string
+  updatedAt: string; // Backend sends ISO string
+}
+
+/**
+ * Frontend Chat Message (for UI display)
+ */
+export interface ChatMessageDisplay
+  extends Omit<ChatMessage, "createdAt" | "updatedAt"> {
   createdAt: Date;
   updatedAt: Date;
 }
 
 /**
- * Send Message Input
+ * Send Message Input (matches backend SendMessageInput)
  */
 export interface SendMessageInput {
   projectId: string;
@@ -32,39 +45,17 @@ export interface SendMessageInput {
 }
 
 /**
- * Get Messages Input
+ * Get Messages Input (matches backend GetMessagesInput)
  */
 export interface GetMessagesInput {
-  projectId?: string;
+  projectId: string;
   limit?: number;
   skip?: number;
   type?: MessageType | "all";
 }
 
 /**
- * Chat Message Event (from Socket.IO)
- */
-export interface ChatMessageEvent {
-  messageId?: string;
-  projectId: string;
-  userId: string;
-  username: string;
-  message: string | ChatMessage;
-  type?: MessageType;
-  timestamp: string;
-}
-
-/**
- * Typing Event (from Socket.IO)
- */
-export interface TypingEvent {
-  userId: string;
-  username: string;
-  isTyping: boolean;
-}
-
-/**
- * Message Action Metadata
+ * Message Action Metadata (matches backend)
  */
 export type MessageAction =
   | "user_joined"
@@ -73,7 +64,7 @@ export type MessageAction =
   | "model_added";
 
 /**
- * System Message Metadata
+ * System Message Metadata (matches backend)
  */
 export interface SystemMessageMetadata {
   action: MessageAction;
@@ -82,7 +73,7 @@ export interface SystemMessageMetadata {
 }
 
 /**
- * Default Message Limits
+ * Default Message Limits (matches backend)
  */
 export const DEFAULT_MESSAGE_LIMIT = 50;
 export const MAX_MESSAGE_LIMIT = 100;
@@ -96,3 +87,27 @@ export const MESSAGE_TYPE_COLORS = {
   system: "text-muted-foreground",
   notification: "text-blue-500",
 } as const;
+
+/**
+ * Transform backend message to frontend format
+ */
+export function transformChatMessage(
+  backendMessage: ChatMessage
+): ChatMessageDisplay {
+  return {
+    ...backendMessage,
+    id: backendMessage._id,
+    createdAt: new Date(backendMessage.createdAt),
+    updatedAt: new Date(backendMessage.updatedAt),
+  };
+}
+
+/**
+ * Get username from message
+ */
+export function getChatMessageUsername(message: ChatMessage): string {
+  if (typeof message.userId === "object") {
+    return message.userId.username;
+  }
+  return message.username || "Unknown";
+}

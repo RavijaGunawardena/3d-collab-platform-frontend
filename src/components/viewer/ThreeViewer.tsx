@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { Canvas, useThree, useFrame, ThreeEvent } from "@react-three/fiber";
+import { Canvas, useThree, ThreeEvent } from "@react-three/fiber";
 import {
   OrbitControls,
   Grid,
@@ -9,9 +9,9 @@ import {
 import * as THREE from "three";
 import { toast } from "sonner";
 
-import { Project, CameraState, Vector3 } from "@/types/project.types";
+import { ProjectDisplay, CameraState, Vector3 } from "@/types/project.types";
 import { Annotation } from "@/types/annotation.types";
-import { useCameraSync } from "@/hooks/useSocket";
+import { useCameraSync, useAnnotationSync } from "@/hooks/useSocket";
 import { projectService } from "@/services/projectService";
 import { annotationService } from "@/services/annotationService";
 import { AnnotationMarkers } from "@/components/viewer/AnnotationMarkers";
@@ -30,7 +30,7 @@ function Scene({
   selectedAnnotationId,
   onAnnotationClick,
 }: {
-  project: Project;
+  project: ProjectDisplay;
   selectedModelId: string | null;
   onModelUpdate: () => void;
   isPlacingAnnotation: boolean;
@@ -125,7 +125,8 @@ function Model3D({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const transformRef = useRef<any>(null);
-  //   const { camera, gl } = useThree();
+  const lastUpdateTime = useRef<number>(0);
+  const updateThrottle = 3000; // 3 seconds throttle as requested
 
   useEffect(() => {
     if (meshRef.current) {
@@ -145,10 +146,15 @@ function Model3D({
   }, [model]);
 
   /**
-   * Handle transform end - save to backend
+   * Handle transform end - save to backend with throttling
    */
   const handleTransformEnd = async () => {
     if (!meshRef.current || !model._id) return;
+
+    const now = Date.now();
+    if (now - lastUpdateTime.current < updateThrottle) {
+      return; // Skip update if within throttle period
+    }
 
     try {
       await projectService.updateModel(projectId, model._id, {
@@ -169,6 +175,7 @@ function Model3D({
         },
       });
 
+      lastUpdateTime.current = now;
       onUpdate();
     } catch (error) {
       console.error("Failed to update model transform:", error);
@@ -256,7 +263,7 @@ function Model3D({
 
 /**
  * Camera Controller
- * Manages camera synchronization
+ * Manages camera synchronization with 3-second throttling
  */
 function CameraController({
   projectId,
@@ -267,12 +274,9 @@ function CameraController({
 }) {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
-  const lastUpdateTime = useRef(0);
-  const updateThrottle = 100; // Update every 100ms
 
   const { updateCamera } = useCameraSync(projectId, (data) => {
     // Receive camera updates from other users
-    // For now, we won't force camera changes (optional feature)
     console.log("Camera update from:", data.username);
   });
 
@@ -287,34 +291,30 @@ function CameraController({
     }
   }, [initialCamera, camera]);
 
-  // Throttled camera update broadcast
-  useFrame(() => {
-    const now = Date.now();
-    if (now - lastUpdateTime.current > updateThrottle) {
-      if (controlsRef.current) {
-        const target = controlsRef.current.target;
-        updateCamera({
-          position: {
-            x: camera.position.x,
-            y: camera.position.y,
-            z: camera.position.z,
-          },
-          rotation: {
-            x: camera.rotation.x,
-            y: camera.rotation.y,
-            z: camera.rotation.z,
-          },
-          target: {
-            x: target.x,
-            y: target.y,
-            z: target.z,
-          },
-          zoom: 1,
-        });
-      }
-      lastUpdateTime.current = now;
+  // Handle camera changes with automatic throttling (handled in useCameraSync)
+  const handleCameraChange = () => {
+    if (controlsRef.current) {
+      const target = controlsRef.current.target;
+      updateCamera({
+        position: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
+        rotation: {
+          x: camera.rotation.x,
+          y: camera.rotation.y,
+          z: camera.rotation.z,
+        },
+        target: {
+          x: target.x,
+          y: target.y,
+          z: target.z,
+        },
+        zoom: 1,
+      });
     }
-  });
+  };
 
   return (
     <OrbitControls
@@ -325,6 +325,7 @@ function CameraController({
       minDistance={2}
       maxDistance={50}
       maxPolarAngle={Math.PI / 2}
+      onChange={handleCameraChange}
     />
   );
 }
@@ -333,7 +334,7 @@ function CameraController({
  * Three Viewer Props
  */
 interface ThreeViewerProps {
-  project: Project;
+  project: ProjectDisplay;
   selectedModelId: string | null;
   isPlacingAnnotation: boolean;
   onAnnotationPlaced: (position: Vector3) => void;
@@ -356,6 +357,32 @@ export function ThreeViewer({
   >(null);
 
   /**
+   * Real-time annotation sync
+   */
+  const { createAnnotation, updateAnnotation, deleteAnnotation } =
+    useAnnotationSync(
+      project.id,
+      (data) => {
+        // Annotation created
+        setAnnotations((prev) => [...prev, data.annotation]);
+      },
+      (data) => {
+        // Annotation updated
+        setAnnotations((prev) =>
+          prev.map((ann) =>
+            ann.id === data.annotationId ? { ...ann, ...data.updates } : ann
+          )
+        );
+      },
+      (data) => {
+        // Annotation deleted
+        setAnnotations((prev) =>
+          prev.filter((ann) => ann.id !== data.annotationId)
+        );
+      }
+    );
+
+  /**
    * Fetch annotations
    */
   useEffect(() => {
@@ -372,8 +399,8 @@ export function ThreeViewer({
 
     fetchAnnotations();
 
-    // Refresh annotations every 5 seconds
-    const interval = setInterval(fetchAnnotations, 5000);
+    // Refresh annotations every 30 seconds (reduced frequency)
+    const interval = setInterval(fetchAnnotations, 30000);
     return () => clearInterval(interval);
   }, [project.id]);
 

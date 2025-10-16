@@ -1,10 +1,11 @@
+export default ProjectsPage;
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Loader2, FolderOpen } from "lucide-react";
-// import { toast } from "sonner";
+import { Plus, Search, Loader2, FolderOpen, User, Users } from "lucide-react";
 
 import { useProjectStore } from "@/store/projectStore";
 import { useAuthStore } from "@/store/authStore";
+import { getUserDisplayName } from "@/types/project.types";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 
 /**
@@ -28,20 +30,36 @@ export function ProjectsPage() {
     projects,
     isLoading,
     error,
+    fetchProjects,
     fetchMyProjects,
     setSearchQuery,
     searchQuery,
+    currentPage,
+    totalPages,
+    totalProjects,
   } = useProjectStore();
 
   const [localSearch, setLocalSearch] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
 
   /**
-   * Fetch projects on mount
+   * Fetch projects based on active tab
+   */
+  const loadProjects = () => {
+    if (activeTab === "all") {
+      fetchProjects();
+    } else {
+      fetchMyProjects();
+    }
+  };
+
+  /**
+   * Fetch projects on mount and tab change
    */
   useEffect(() => {
-    fetchMyProjects();
-  }, [fetchMyProjects]);
+    loadProjects();
+  }, [activeTab]);
 
   /**
    * Handle search with debounce
@@ -73,22 +91,12 @@ export function ProjectsPage() {
   /**
    * Format date for display
    */
-  const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("en-US", {
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
-  };
-
-  /**
-   * Get creator username
-   */
-  const getCreatorUsername = (createdBy: any): string => {
-    if (typeof createdBy === "string") {
-      return "Unknown";
-    }
-    return createdBy?.username || "Unknown";
   };
 
   return (
@@ -98,7 +106,7 @@ export function ProjectsPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">My Projects</h1>
+              <h1 className="text-2xl font-bold">Projects</h1>
               <p className="text-sm text-muted-foreground">
                 Welcome back, {user?.username}
               </p>
@@ -120,6 +128,20 @@ export function ProjectsPage() {
               className="pl-10"
             />
           </div>
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                All Projects
+              </TabsTrigger>
+              <TabsTrigger value="my" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                My Projects
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </header>
 
@@ -152,19 +174,27 @@ export function ProjectsPage() {
                 <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                   <FolderOpen className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <CardTitle>No projects yet</CardTitle>
+                <CardTitle>
+                  {activeTab === "all"
+                    ? "No projects found"
+                    : "No projects yet"}
+                </CardTitle>
                 <CardDescription>
                   {searchQuery
                     ? `No projects found for "${searchQuery}"`
+                    : activeTab === "all"
+                    ? "No projects are available"
                     : "Create your first 3D collaborative project to get started"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="text-center">
-                <Button onClick={handleCreateProject}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Project
-                </Button>
-              </CardContent>
+              {activeTab === "my" && (
+                <CardContent className="text-center">
+                  <Button onClick={handleCreateProject}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Project
+                  </Button>
+                </CardContent>
+              )}
             </Card>
           </div>
         )}
@@ -172,51 +202,73 @@ export function ProjectsPage() {
         {/* Projects Grid */}
         {!isLoading && projects.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <Card
-                key={project.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => handleProjectClick(project.id)}
-              >
-                <CardHeader>
-                  <CardTitle className="line-clamp-1">
-                    {project.title}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {project.description || "No description"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center justify-between">
-                      <span>Models:</span>
-                      <span className="font-medium text-foreground">
-                        {project.modelCount || 0}
-                      </span>
+            {projects.map((project) => {
+              return (
+                <Card
+                  key={project.id}
+                  className={`cursor-pointer hover:shadow-lg transition-all hover:shadow-lg"
+                  }`}
+                  onClick={() => handleProjectClick(project.id)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="line-clamp-1 flex items-center gap-2">
+                          {project.title}
+                        </CardTitle>
+                        <CardDescription className="line-clamp-2">
+                          {project.description || "No description"}
+                        </CardDescription>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>Created:</span>
-                      <span className="font-medium text-foreground">
-                        {formatDate(project.createdAt)}
-                      </span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between">
+                        <span>Models:</span>
+                        <span className="font-medium text-foreground">
+                          {project.modelCount || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Created:</span>
+                        <span className="font-medium text-foreground">
+                          {formatDate(project.createdAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>By:</span>
+                        <span className={`font-medium text-foreground`}>
+                          {activeTab === "my"
+                            ? "You"
+                            : getUserDisplayName(project.createdBy)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span>By:</span>
-                      <span className="font-medium text-foreground">
-                        {getCreatorUsername(project.createdBy)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
 
-        {/* Projects Count */}
+        {/* Projects Count and Pagination Info */}
         {!isLoading && projects.length > 0 && (
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            Showing {projects.length} project{projects.length !== 1 ? "s" : ""}
+            <div className="space-y-2">
+              <p>
+                Showing {projects.length} project
+                {projects.length !== 1 ? "s" : ""}
+                {activeTab === "all" && totalProjects > 0 && (
+                  <span> of {totalProjects} total</span>
+                )}
+              </p>
+              {activeTab === "all" && totalPages > 1 && (
+                <p>
+                  Page {currentPage} of {totalPages}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -229,5 +281,3 @@ export function ProjectsPage() {
     </div>
   );
 }
-
-export default ProjectsPage;

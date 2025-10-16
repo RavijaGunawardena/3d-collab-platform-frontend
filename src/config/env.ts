@@ -118,20 +118,25 @@ export const apiEndpoints = {
       `/projects/${projectId}/models/${modelId}`,
     deleteModel: (projectId: string, modelId: string) =>
       `/projects/${projectId}/models/${modelId}`,
-    addCamera: (projectId: string) =>
-      `/projects/${projectId}/camera`,
+    addCamera: (projectId: string) => `/projects/${projectId}/camera`,
   },
   annotations: {
+    create: "/annotations",
+    byProject: (projectId: string) => `/annotations/project/${projectId}`,
+    query: `/annotations`,
+    detail: (annotationId: string) => `/annotations/${annotationId}`,
     list: (projectId: string) => `/projects/${projectId}/annotations`,
-    create: (projectId: string) => `/projects/${projectId}/annotations`,
-    update: (projectId: string, annotationId: string) =>
-      `/projects/${projectId}/annotations/${annotationId}`,
-    delete: (projectId: string, annotationId: string) =>
-      `/projects/${projectId}/annotations/${annotationId}`,
+    update: (annotationId: string) => `/annotations/${annotationId}`,
+    delete: (annotationId: string) => `/annotations/${annotationId}`,
+    toggleVisibility: (annotationId: string) =>
+      `/annotations/${annotationId}/visibility`,
+    count: (projectId: string) => `/annotations/project/${projectId}/count`,
   },
   chat: {
-    messages: (projectId: string) => `/projects/${projectId}/messages`,
-    send: (projectId: string) => `/projects/${projectId}/messages`,
+    messages: (projectId: string) => `/chat/projects/${projectId}/messages`,
+    recentMessages: (projectId: string) => `/chat/projects/${projectId}/recent`,
+    count: (projectId: string) => `/chat/projects/${projectId}/count`,
+    send: `/chat/messages`,
   },
   health: "/health",
 };

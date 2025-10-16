@@ -26,12 +26,12 @@ export interface ActiveUser extends SocketUser {
 
 /**
  * ==========================================
- * PROJECT EVENTS
+ * PROJECT EVENTS (matches backend exactly)
  * ==========================================
  */
 
 /**
- * Join Project Data
+ * Join Project Data (matches backend JoinProjectData)
  */
 export interface JoinProjectData {
   projectId: string;
@@ -39,7 +39,7 @@ export interface JoinProjectData {
 }
 
 /**
- * Join Project Response
+ * Join Project Response (matches backend response)
  */
 export interface JoinProjectResponse {
   success: boolean;
@@ -48,14 +48,14 @@ export interface JoinProjectResponse {
 }
 
 /**
- * Leave Project Data
+ * Leave Project Data (matches backend LeaveProjectData)
  */
 export interface LeaveProjectData {
   projectId: string;
 }
 
 /**
- * User Joined Event
+ * User Joined Event (matches backend emit)
  */
 export interface UserJoinedEvent {
   userId: string;
@@ -64,7 +64,7 @@ export interface UserJoinedEvent {
 }
 
 /**
- * User Left Event
+ * User Left Event (matches backend emit)
  */
 export interface UserLeftEvent {
   userId: string;
@@ -74,12 +74,12 @@ export interface UserLeftEvent {
 
 /**
  * ==========================================
- * CAMERA EVENTS
+ * CAMERA EVENTS (matches backend exactly)
  * ==========================================
  */
 
 /**
- * Camera Update Data
+ * Camera Update Data (matches backend CameraUpdateData)
  */
 export interface CameraUpdateData {
   projectId: string;
@@ -89,79 +89,93 @@ export interface CameraUpdateData {
 }
 
 /**
- * Camera Update Event (broadcast)
+ * Camera Update Event (matches backend broadcast)
  */
 export interface CameraUpdateEvent {
+  projectId: string;
+  cameraState: Partial<CameraState>;
   userId: string;
   username: string;
-  cameraState: Partial<CameraState>;
   timestamp: string;
 }
 
 /**
  * ==========================================
- * ANNOTATION EVENTS
+ * ANNOTATION EVENTS (matches backend exactly)
  * ==========================================
  */
 
 /**
- * Annotation Attachment Type
+ * Attachment Type (matches backend AttachmentType)
  */
-export type AnnotationAttachmentType = "edge" | "face" | "vertex" | "random";
+export type AnnotationAttachmentType = "vertex" | "edge" | "face" | "position";
 
 /**
- * Create Annotation Data
+ * Annotation Style (matches backend AnnotationStyle)
+ */
+export type AnnotationStyle = "pin" | "arrow" | "note" | "marker";
+
+/**
+ * Create Annotation Data (matches backend CreateAnnotationData)
  */
 export interface CreateAnnotationData {
   projectId: string;
-  position: Vector3;
-  text: string;
-  attachmentType: AnnotationAttachmentType;
   modelId?: string;
+  text: string;
+  position: Vector3;
+  attachmentType?: AnnotationAttachmentType;
+  style?: AnnotationStyle;
+  color?: string;
 }
 
 /**
- * Annotation Created Event
+ * Annotation Created Event (matches backend broadcast)
  */
 export interface AnnotationCreatedEvent {
-  annotationId: string;
   projectId: string;
+  annotation: any; // Full annotation object from backend
   userId: string;
   username: string;
-  position: Vector3;
-  text: string;
-  attachmentType: AnnotationAttachmentType;
-  modelId?: string;
-  createdAt: string;
+  timestamp: string;
 }
 
 /**
- * Update Annotation Data
+ * Update Annotation Data (matches backend UpdateAnnotationData)
  */
 export interface UpdateAnnotationData {
   projectId: string;
   annotationId: string;
-  text?: string;
-  position?: Vector3;
-}
-
-/**
- * Annotation Updated Event
- */
-export interface AnnotationUpdatedEvent {
-  annotationId: string;
-  projectId: string;
-  userId: string;
-  username: string;
   updates: {
     text?: string;
     position?: Vector3;
+    attachmentType?: AnnotationAttachmentType;
+    style?: AnnotationStyle;
+    color?: string;
+    visible?: boolean;
   };
+}
+
+/**
+ * Annotation Updated Event (matches backend broadcast)
+ */
+export interface AnnotationUpdatedEvent {
+  projectId: string;
+  annotationId: string;
+  updates: {
+    text?: string;
+    position?: Vector3;
+    attachmentType?: AnnotationAttachmentType;
+    style?: AnnotationStyle;
+    color?: string;
+    visible?: boolean;
+  };
+  userId: string;
+  username: string;
   timestamp: string;
 }
 
 /**
- * Delete Annotation Data
+ * Delete Annotation Data (matches backend DeleteAnnotationData)
  */
 export interface DeleteAnnotationData {
   projectId: string;
@@ -169,11 +183,11 @@ export interface DeleteAnnotationData {
 }
 
 /**
- * Annotation Deleted Event
+ * Annotation Deleted Event (matches backend broadcast)
  */
 export interface AnnotationDeletedEvent {
-  annotationId: string;
   projectId: string;
+  annotationId: string;
   userId: string;
   username: string;
   timestamp: string;
@@ -181,12 +195,12 @@ export interface AnnotationDeletedEvent {
 
 /**
  * ==========================================
- * CHAT EVENTS
+ * CHAT EVENTS (matches backend exactly)
  * ==========================================
  */
 
 /**
- * Chat Message Data
+ * Chat Message Data (matches backend ChatMessageData)
  */
 export interface ChatMessageData {
   projectId: string;
@@ -194,30 +208,36 @@ export interface ChatMessageData {
 }
 
 /**
- * Chat Message Event
+ * Chat Message Response (matches backend callback)
+ */
+export interface ChatMessageResponse {
+  success: boolean;
+  message?: any; // Full message object from backend
+  error?: string;
+}
+
+/**
+ * Chat Message Event (matches backend broadcast)
  */
 export interface ChatMessageEvent {
-  messageId: string;
   projectId: string;
-  userId: string;
-  username: string;
-  message: string;
-  type: "user" | "system";
+  message: any; // Full message object from backend
   timestamp: string;
 }
 
 /**
- * Chat Typing Data
+ * Typing Data (matches backend TypingData)
  */
-export interface ChatTypingData {
+export interface TypingData {
   projectId: string;
   isTyping: boolean;
 }
 
 /**
- * Chat Typing Event
+ * Typing Event (matches backend broadcast)
  */
-export interface ChatTypingEvent {
+export interface TypingEvent {
+  projectId: string;
   userId: string;
   username: string;
   isTyping: boolean;
@@ -225,7 +245,7 @@ export interface ChatTypingEvent {
 
 /**
  * ==========================================
- * CLIENT TO SERVER EVENTS
+ * CLIENT TO SERVER EVENTS (matches backend handlers)
  * ==========================================
  */
 export interface ClientToServerEvents {
@@ -250,14 +270,14 @@ export interface ClientToServerEvents {
   // Chat events
   "chat:message": (
     data: ChatMessageData,
-    callback: (response: any) => void
+    callback: (response: ChatMessageResponse) => void
   ) => void;
-  "chat:typing": (data: ChatTypingData) => void;
+  "chat:typing": (data: TypingData) => void;
 }
 
 /**
  * ==========================================
- * SERVER TO CLIENT EVENTS
+ * SERVER TO CLIENT EVENTS (matches backend emits)
  * ==========================================
  */
 export interface ServerToClientEvents {
@@ -275,7 +295,10 @@ export interface ServerToClientEvents {
 
   // Chat events
   "chat:message": (data: ChatMessageEvent) => void;
-  "chat:typing": (data: ChatTypingEvent) => void;
+  "chat:typing": (data: TypingEvent) => void;
+
+  // Error events
+  error: (data: { message: string; code: string; details?: string }) => void;
 
   // Connection events
   connect: () => void;
@@ -315,4 +338,7 @@ export const SOCKET_EVENTS = {
   // Chat
   CHAT_MESSAGE: "chat:message",
   CHAT_TYPING: "chat:typing",
+
+  // Error
+  ERROR: "error",
 } as const;

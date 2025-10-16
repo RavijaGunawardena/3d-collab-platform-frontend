@@ -1,11 +1,17 @@
 import socketManager from "@/lib/socket";
 import { tokenManager } from "@/services/api";
 import {
+  ActiveUser,
   ClientToServerEvents,
   JoinProjectData,
   JoinProjectResponse,
   ServerToClientEvents,
   SocketStatus,
+  CameraUpdateData,
+  ChatMessageData,
+  ChatMessageResponse,
+  ChatMessageEvent,
+  TypingEvent,
 } from "@/types/socket.types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -20,12 +26,9 @@ export function useSocket() {
       setIsConnected(newStatus === "connected");
     });
 
-    // Connect if not connected
+    // Connect if not connected (no auth required on connect)
     if (!socketManager.isConnected()) {
-      const token = tokenManager.getToken();
-      if (token) {
-        socketManager.connect();
-      }
+      socketManager.connect();
     } else {
       setIsConnected(true);
     }
@@ -109,7 +112,7 @@ export function useSocketEmit() {
 
 /**
  * Project Room Hook
- * Manages joining/leaving project rooms
+ * Manages joining/leaving project rooms with proper authentication
  */
 export function useProjectRoom(projectId: string | null) {
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
@@ -120,7 +123,7 @@ export function useProjectRoom(projectId: string | null) {
   const emit = useSocketEmit();
 
   /**
-   * Join project room
+   * Join project room (this is where authentication happens)
    */
   const joinProject = useCallback(async () => {
     if (!projectId || !isConnected) {
@@ -142,14 +145,19 @@ export function useProjectRoom(projectId: string | null) {
       token,
     };
 
+    console.log("PROHJEFT ID", joinData);
+
+    // This is where authentication happens - backend verifies token
     emit("project:join", joinData, (response: JoinProjectResponse) => {
       if (response.success) {
         setActiveUsers(response.activeUsers || []);
         setIsJoined(true);
         setError(null);
+        console.log("Successfully joined project", projectId);
       } else {
         setError(response.error || "Failed to join project");
         setIsJoined(false);
+        console.error("Failed to join project:", response.error);
       }
       setIsJoining(false);
     });
@@ -230,16 +238,18 @@ export function useProjectRoom(projectId: string | null) {
 
 /**
  * Camera Sync Hook
- * Manages real-time camera synchronization
+ * Manages real-time camera synchronization with 3-second throttling
  */
 export function useCameraSync(
   projectId: string | null,
   onCameraUpdate?: (data: any) => void
 ) {
   const emit = useSocketEmit();
+  const lastUpdateTime = useRef<number>(0);
+  const updateThrottle = 3000; // 3 seconds as requested
 
   /**
-   * Update camera state
+   * Update camera state with throttling
    */
   const updateCamera = useCallback(
     (cameraState: any) => {
@@ -248,12 +258,20 @@ export function useCameraSync(
       const user = tokenManager.getUser();
       if (!user) return;
 
-      emit("camera:update", {
+      const now = Date.now();
+      if (now - lastUpdateTime.current < updateThrottle) {
+        return; // Skip update if within throttle period
+      }
+
+      const cameraData: CameraUpdateData = {
         projectId,
         cameraState,
         userId: user.id,
         username: user.username,
-      });
+      };
+
+      emit("camera:update", cameraData);
+      lastUpdateTime.current = now;
     },
     [projectId, emit]
   );
@@ -280,7 +298,7 @@ export function useCameraSync(
 
 /**
  * Chat Hook
- * Manages real-time chat
+ * Manages real-time chat with proper message handling
  */
 export function useChat(projectId: string | null) {
   const [messages, setMessages] = useState<any[]>([]);
@@ -294,9 +312,16 @@ export function useChat(projectId: string | null) {
     (message: string) => {
       if (!projectId || !message.trim()) return;
 
-      emit("chat:message", { projectId, message }, (response) => {
+      const messageData: ChatMessageData = {
+        projectId,
+        message: message.trim(),
+      };
+
+      emit("chat:message", messageData, (response: ChatMessageResponse) => {
         if (response.success) {
-          // Message sent successfully
+          console.log("Message sent successfully");
+        } else {
+          console.error("Failed to send message:", response.error);
         }
       });
     },
@@ -320,8 +345,9 @@ export function useChat(projectId: string | null) {
    */
   useSocketEvent(
     "chat:message",
-    useCallback((data) => {
-      setMessages((prev) => [...prev, data]);
+    useCallback((data: ChatMessageEvent) => {
+      // Add new message to state (backend sends full message object)
+      setMessages((prev) => [...prev, data.message]);
     }, [])
   );
 
@@ -330,7 +356,7 @@ export function useChat(projectId: string | null) {
    */
   useSocketEvent(
     "chat:typing",
-    useCallback((data) => {
+    useCallback((data: TypingEvent) => {
       setTypingUsers((prev) => {
         const newSet = new Set(prev);
         if (data.isTyping) {
@@ -343,11 +369,113 @@ export function useChat(projectId: string | null) {
     }, [])
   );
 
+  /**
+   * Clear messages when project changes
+   */
+  useEffect(() => {
+    setMessages([]);
+    setTypingUsers(new Set());
+  }, [projectId]);
+
   return {
     messages,
     typingUsers: Array.from(typingUsers),
     sendMessage,
     setTyping,
+  };
+}
+
+/**
+ * Annotation Sync Hook
+ * Manages real-time annotation synchronization
+ */
+export function useAnnotationSync(
+  projectId: string | null,
+  onAnnotationCreated?: (data: any) => void,
+  onAnnotationUpdated?: (data: any) => void,
+  onAnnotationDeleted?: (data: any) => void
+) {
+  const emit = useSocketEmit();
+
+  /**
+   * Create annotation via socket
+   */
+  const createAnnotation = useCallback(
+    (annotationData: any, callback?: (response: any) => void) => {
+      if (!projectId) return;
+
+      emit(
+        "annotation:create",
+        { projectId, ...annotationData },
+        (response) => {
+          if (callback) callback(response);
+        }
+      );
+    },
+    [projectId, emit]
+  );
+
+  /**
+   * Update annotation via socket
+   */
+  const updateAnnotation = useCallback(
+    (annotationId: string, updates: any) => {
+      if (!projectId) return;
+
+      emit("annotation:update", { projectId, annotationId, updates });
+    },
+    [projectId, emit]
+  );
+
+  /**
+   * Delete annotation via socket
+   */
+  const deleteAnnotation = useCallback(
+    (annotationId: string) => {
+      if (!projectId) return;
+
+      emit("annotation:delete", { projectId, annotationId });
+    },
+    [projectId, emit]
+  );
+
+  /**
+   * Listen to annotation events
+   */
+  useSocketEvent(
+    "annotation:created",
+    useCallback(
+      (data) => {
+        if (onAnnotationCreated) onAnnotationCreated(data);
+      },
+      [onAnnotationCreated]
+    )
+  );
+
+  useSocketEvent(
+    "annotation:updated",
+    useCallback(
+      (data) => {
+        if (onAnnotationUpdated) onAnnotationUpdated(data);
+      },
+      [onAnnotationUpdated]
+    )
+  );
+
+  useSocketEvent(
+    "annotation:deleted",
+    useCallback(
+      (data) => {
+        if (onAnnotationDeleted) onAnnotationDeleted(data);
+      },
+      [onAnnotationDeleted]
+    )
+  );
+
+  return {
+    createAnnotation,
+    updateAnnotation,
+    deleteAnnotation,
   };
 }
 

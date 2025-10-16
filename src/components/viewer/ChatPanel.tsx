@@ -84,7 +84,11 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
 
     try {
       setIsSending(true);
+
+      // Send via socket (real-time)
       sendMessage(messageInput.trim());
+
+      // Clear input and reset typing
       setMessageInput("");
       setTyping(false);
 
@@ -149,23 +153,45 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
   };
 
   /**
+   * Get username from message
+   */
+  const getMessageUsername = (message: any): string => {
+    // Handle populated user object
+    if (message.userId && typeof message.userId === "object") {
+      return message.userId.username;
+    }
+    // Handle direct username field
+    if (message.username) {
+      return message.username;
+    }
+    return "Unknown";
+  };
+
+  /**
    * Render message
    */
-  const renderMessage = (msg: ChatMessage | any) => {
-    const message = msg.message || msg;
-    const type = msg.type || message.type || "text";
-    const username = msg.username || message.username || "Unknown";
-    const text = typeof message === "string" ? message : message.message;
-    const timestamp = msg.timestamp || msg.createdAt || message.createdAt;
+  const renderMessage = (message: any, index: number) => {
+    const type = message.type || "text";
+    const username = getMessageUsername(message);
+    const text = message.message;
+    const timestamp = message.createdAt;
 
     if (type === "system" || type === "notification") {
-      return <div className={`py-2 px-4 ${getMessageStyle(type)}`}>{text}</div>;
+      return (
+        <div
+          key={message._id || index}
+          className={`py-2 px-4 ${getMessageStyle(type)}`}
+        >
+          {text}
+        </div>
+      );
     }
 
     const isOwnMessage = username === user?.username;
 
     return (
       <div
+        key={message._id || index}
         className={`flex gap-3 px-4 py-2 hover:bg-slate-800/30 ${
           isOwnMessage ? "flex-row-reverse" : ""
         }`}
@@ -240,11 +266,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
           </div>
         ) : (
           <div className="space-y-1">
-            {allMessages.map((msg, index) => (
-              <div key={`${msg.id || msg.messageId || index}`}>
-                {renderMessage(msg)}
-              </div>
-            ))}
+            {allMessages.map((msg, index) => renderMessage(msg, index))}
             <div ref={scrollRef} />
           </div>
         )}

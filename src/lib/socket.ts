@@ -5,7 +5,6 @@ import {
   SocketStatus,
 } from "@/types/socket.types";
 import env from "@/config/env";
-import { tokenManager } from "@/services/api";
 
 /**
  * Socket.IO Client Type
@@ -14,18 +13,19 @@ type SocketIOClient = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 /**
  * Socket Manager Class
- * Handles Socket.IO connection lifecycle
+ * Handles Socket.IO connection lifecycle - NO AUTH ON CONNECT
  */
 class SocketManager {
   private socket: SocketIOClient | null = null;
   private status: SocketStatus = "disconnected";
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = env.socketReconnectionAttempts;
-  private reconnectDelay = env.socketReconnectionDelay;
+  private maxReconnectAttempts = env.socketReconnectionAttempts || 5;
+  private reconnectDelay = env.socketReconnectionDelay || 1000;
   private statusListeners: Set<(status: SocketStatus) => void> = new Set();
 
   /**
-   * Initialize socket connection
+   * Initialize socket connection - NO AUTHENTICATION REQUIRED
+   * Backend handles auth during project:join event
    */
   connect(): SocketIOClient {
     if (this.socket?.connected) {
@@ -33,26 +33,17 @@ class SocketManager {
       return this.socket;
     }
 
-    const token = tokenManager.getToken();
-
-    if (!token) {
-      console.error("No authentication token found. Cannot connect to socket.");
-      this.updateStatus("error");
-      throw new Error("Authentication token required for socket connection");
-    }
-
     console.log("Initializing Socket.IO connection...");
     this.updateStatus("connecting");
 
+    // Connect WITHOUT authentication - backend handles auth during join
     this.socket = io(env.socketUrl, {
-      auth: {
-        token,
-      },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: this.reconnectDelay,
       timeout: 10000,
+      // NO AUTH HERE - handled in project:join
     });
 
     this.setupEventListeners();
@@ -97,6 +88,11 @@ class SocketManager {
       }
     });
 
+    // Handle server errors
+    this.socket.on("error", (error) => {
+      console.error("Socket server error:", error);
+    });
+
     // Log all events in development
     if (env.enableLogging) {
       this.socket.onAny((eventName, ...args) => {
@@ -110,7 +106,7 @@ class SocketManager {
    */
   disconnect(): void {
     if (this.socket) {
-      console.log("Diconnecting socket...");
+      console.log("Disconnecting socket...");
       this.socket.disconnect();
       this.socket = null;
       this.updateStatus("disconnected");

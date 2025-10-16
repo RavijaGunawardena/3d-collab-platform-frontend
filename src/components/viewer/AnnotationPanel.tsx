@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { Annotation } from "@/types/annotation.types";
 import { annotationService } from "@/services/annotationService";
+import { useAnnotationSync } from "@/hooks/useSocket";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -30,7 +31,7 @@ interface AnnotationPanelProps {
 
 /**
  * Annotation Panel Component
- * Sidebar panel for managing annotations
+ * Sidebar panel for managing annotations with real-time updates
  */
 export function AnnotationPanel({
   projectId,
@@ -42,6 +43,59 @@ export function AnnotationPanel({
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  /**
+   * Real-time annotation sync
+   */
+  const { createAnnotation, updateAnnotation, deleteAnnotation } =
+    useAnnotationSync(
+      projectId,
+      (data) => {
+        // Real-time annotation created
+        const newAnnotation = transformBackendAnnotation(data.annotation);
+        setAnnotations((prev) => [...prev, newAnnotation]);
+      },
+      (data) => {
+        // Real-time annotation updated
+        setAnnotations((prev) =>
+          prev.map((ann) =>
+            ann.id === data.annotationId ? { ...ann, ...data.updates } : ann
+          )
+        );
+      },
+      (data) => {
+        // Real-time annotation deleted
+        setAnnotations((prev) =>
+          prev.filter((ann) => ann.id !== data.annotationId)
+        );
+
+        // Deselect if deleted
+        if (selectedAnnotationId === data.annotationId) {
+          onAnnotationSelect(null);
+        }
+      }
+    );
+
+  /**
+   * Transform backend annotation to frontend format
+   */
+  const transformBackendAnnotation = (backendAnnotation: any): Annotation => {
+    return {
+      id: backendAnnotation._id,
+      projectId: backendAnnotation.projectId,
+      modelId: backendAnnotation.modelId,
+      userId: backendAnnotation.userId,
+      username: backendAnnotation.username,
+      text: backendAnnotation.text,
+      position: backendAnnotation.position,
+      attachmentType: backendAnnotation.attachmentType,
+      style: backendAnnotation.style,
+      color: backendAnnotation.color,
+      visible: backendAnnotation.visible,
+      createdAt: new Date(backendAnnotation.createdAt),
+      updatedAt: new Date(backendAnnotation.updatedAt),
+    };
+  };
 
   /**
    * Fetch annotations
@@ -76,11 +130,16 @@ export function AnnotationPanel({
 
     try {
       setIsDeleting(true);
+
+      // Delete via API
       await annotationService.deleteAnnotation(annotationId);
+
+      // Also emit via socket for real-time updates
+      deleteAnnotation(annotationId);
 
       toast.success("Annotation Deleted");
 
-      // Remove from local state
+      // Remove from local state (will also be removed by real-time event)
       setAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
 
       // Deselect if deleted
@@ -102,9 +161,15 @@ export function AnnotationPanel({
    */
   const handleToggleVisibility = async (annotation: Annotation) => {
     try {
-      await annotationService.toggleVisibility(annotation.id);
+      // Update via API
+      const updatedAnnotation = await annotationService.toggleVisibility(
+        annotation.id
+      );
 
-      // Update local state
+      // Emit via socket for real-time updates
+      updateAnnotation(annotation.id, { visible: !annotation.visible });
+
+      // Update local state (will also be updated by real-time event)
       setAnnotations((prev) =>
         prev.map((a) =>
           a.id === annotation.id ? { ...a, visible: !a.visible } : a
