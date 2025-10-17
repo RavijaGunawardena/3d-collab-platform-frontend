@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Project, Model3D } from "@/types/project.types";
+import { Project, Model3D, ProjectDisplay } from "@/types/project.types";
 import { projectService } from "@/services/projectService";
 
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ import {
  * Model Controls Props
  */
 interface ModelControlsProps {
-  project: Project;
+  project: ProjectDisplay | null;
   onProjectUpdate: () => void;
   selectedModelId: string | null;
   onModelSelect: (modelId: string | null) => void;
@@ -69,7 +69,7 @@ export function ModelControls({
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  const models = project.models || [];
+  const models = project?.models || [];
   const visibleModels = models.filter((model) => model.visible);
   const hiddenModels = models.filter((model) => !model.visible);
 
@@ -87,6 +87,7 @@ export function ModelControls({
 
     try {
       setIsDeleting(modelId);
+      if (!project?.id) return;
       await projectService.deleteModel(project.id, modelId);
 
       toast.success("Model Deleted", {
@@ -118,6 +119,7 @@ export function ModelControls({
     currentVisibility: boolean
   ) => {
     try {
+      if (!project?.id) return;
       await projectService.updateModel(project.id, modelId, {
         visible: !currentVisibility,
       });
@@ -360,7 +362,7 @@ export function ModelControls({
       <AddModelDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        projectId={project.id}
+        projectId={project?.id}
         onModelAdded={onProjectUpdate}
       />
     </TooltipProvider>

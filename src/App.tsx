@@ -6,7 +6,7 @@ import LoginPage from "./pages/Loginpage";
 import useAuthStore from "./store/authStore";
 import AuthProvider from "./components/auth/AuthProvider";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
-import SocketDebugger from "./SocketDebugger";
+// import SocketDebugger from "./SocketDebugger";
 
 // Lazy loaded pages
 const ProjectPages = lazy(() => import("@/pages/ProjectsPage"));
