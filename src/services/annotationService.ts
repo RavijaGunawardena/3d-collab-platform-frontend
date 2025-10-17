@@ -124,7 +124,7 @@ class AnnotationService {
    */
   async deleteAnnotation(annotationId: string): Promise<void> {
     await apiClient.delete(
-      `${apiEndpoints.annotations.delete}/${annotationId}`
+      `${apiEndpoints.annotations.delete(annotationId)}`
     );
   }
 
@@ -133,7 +133,7 @@ class AnnotationService {
    */
   async toggleVisibility(annotationId: string): Promise<Annotation> {
     const response = await apiClient.patch<BackendApiResponse<Annotation>>(
-      `${apiEndpoints.annotations.toggleVisibility}/${annotationId}`
+      `${apiEndpoints.annotations.toggleVisibility(annotationId)}`
     );
 
     if (!response.data.data) {
