@@ -40,7 +40,7 @@ A real-time 3D collaborative platform built with React, TypeScript, Three.js, an
 
 ## 📋 Prerequisites
 
-- Node.js 16.x or higher
+- Node.js 22.x or higher
 - npm or yarn
 - Backend server running (see backend setup)
 
@@ -172,10 +172,10 @@ frontend/
 ## 🔧 Technologies
 
 ### Frontend Stack
-- **React 18** - UI library
+- **React** - UI library
 - **TypeScript** - Type safety
 - **Vite** - Build tool
-- **React Router v6** - Routing
+- **React Router** - Routing
 - **Zustand** - State management
 - **Three.js** - 3D rendering
 - **@react-three/fiber** - React renderer for Three.js
@@ -188,25 +188,6 @@ frontend/
 - **Tailwind CSS v4** - Styling
 - **Sonner** - Toast notifications
 - **Lucide React** - Icons
-
-## 🎨 Design System
-
-### Colors (Slate Theme)
-- **Primary**: Blue (#60a5fa)
-- **Background**: Slate-950 (dark mode)
-- **Borders**: Slate-800
-- **Text**: White/Slate-100
-
-### Typography
-- **Font**: System font stack
-- **Sizes**: Responsive (rem-based)
-
-### Spacing
-- **Grid**: 4px base unit
-- **Breakpoints**: 
-  - Mobile: < 768px
-  - Tablet: 768px - 1024px
-  - Desktop: > 1024px
 
 ## 📡 API Integration
 
@@ -308,53 +289,6 @@ The `dist` folder can be deployed to any static hosting:
 ```bash
 npm install -g vercel
 vercel --prod
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**1. Backend Connection Error**
-- Ensure backend server is running
-- Check `VITE_API_URL` in `.env`
-- Verify CORS settings on backend
-
-**2. Socket.IO Not Connecting**
-- Check `VITE_SOCKET_URL` matches backend
-- Ensure WebSocket is not blocked by firewall
-- Check browser console for errors
-
-**3. 3D Models Not Rendering**
-- Check WebGL support in browser
-- Clear browser cache
-- Check console for Three.js errors
-
-**4. Authentication Issues**
-- Clear localStorage
-- Check JWT token validity
-- Verify backend authentication endpoint
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 👥 Contributors
-
-- Ravija Gunawardana - Initial work
-
-## 🙏 Acknowledgments
-
-- Three.js community
-- React Three Fiber team
-- shadcn/ui for beautiful components
-- Socket.IO for real-time features
-
-## 📞 Support
-
-For issues and questions:
-- Create an issue on GitHub
-- Contact: your-email@example.com
-
 ---
 
 **Built with ❤️ using React, TypeScript, and Three.js**
