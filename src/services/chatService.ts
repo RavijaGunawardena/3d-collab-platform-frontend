@@ -36,7 +36,7 @@ class ChatService {
     limit: number = 50
   ): Promise<ChatMessage[]> {
 
-    console.log("PROJECTID", projectId)
+    // console.log("PROJECTID", projectId)
 
     const response = await apiClient.get<BackendApiResponse<ChatMessage[]>>(
       `${apiEndpoints.chat.recentMessages(projectId)}?limit=${limit}`

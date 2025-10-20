@@ -122,9 +122,9 @@ const createAxiosInstance = (): AxiosInstance => {
 
       // Log request in development
       if (env.enableLogging) {
-        console.log(
-          `🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`
-        );
+        // console.log(
+        //   `🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`
+        // );
       }
 
       return config;

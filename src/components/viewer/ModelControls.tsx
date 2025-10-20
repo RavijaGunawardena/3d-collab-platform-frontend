@@ -224,6 +224,9 @@ export function ModelControls({
               <TooltipTrigger asChild>
                 <Button
                   size="lg"
+                  onClick={() => {
+                    setIsSheetOpen(true);
+                  }}
                   className="relative h-14 w-14 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 bg-gradient-to-br from-slate-800/90 to-slate-700/90 hover:from-slate-700/90 hover:to-slate-600/90 backdrop-blur-xl border border-slate-600/50 hover:border-slate-500/50 group"
                   variant="secondary"
                 >
@@ -634,7 +637,7 @@ function EnhancedModelCard({
                 align="end"
                 className="w-48 bg-slate-800/95 backdrop-blur-sm border-slate-700"
               >
-                <DropdownMenuItem
+                {/* <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelect();
@@ -652,7 +655,7 @@ function EnhancedModelCard({
                       Select & Transform
                     </>
                   )}
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
 
                 <DropdownMenuItem
                   onClick={(e) => {

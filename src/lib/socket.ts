@@ -32,7 +32,7 @@ class SocketManager {
 
   private async createConnection(): Promise<SocketIOClient> {
     return new Promise((resolve, reject) => {
-      console.log("Creating socket connection to:", env.socketUrl);
+      // console.log("Creating socket connection to:", env.socketUrl);
       this.updateStatus("connecting");
 
       if (this.socket) {
@@ -54,7 +54,7 @@ class SocketManager {
 
       this.socket.on("connect", () => {
         clearTimeout(timeoutId);
-        console.log("Socket connected:", this.socket?.id);
+        // console.log("Socket connected:", this.socket?.id);
         this.reconnectAttempts = 0;
         this.updateStatus("connected");
         this.connectionPromise = null;
@@ -63,7 +63,7 @@ class SocketManager {
 
       this.socket.on("disconnect", (reason) => {
         clearTimeout(timeoutId);
-        console.log("Socket disconnected:", reason);
+        // console.log("Socket disconnected:", reason);
         this.updateStatus("disconnected");
         this.connectionPromise = null;
 
@@ -96,7 +96,7 @@ class SocketManager {
 
       if (env.enableLogging) {
         this.socket.onAny((eventName, ...args) => {
-          console.log(`Socket Event: ${eventName}`, args);
+          // console.log(`Socket Event: ${eventName}`, args);
         });
       }
     });
@@ -104,7 +104,7 @@ class SocketManager {
 
   disconnect(): void {
     if (this.socket) {
-      console.log("Disconnecting socket...");
+      // console.log("Disconnecting socket...");
       this.socket.disconnect();
       this.socket = null;
       this.updateStatus("disconnected");
@@ -113,7 +113,7 @@ class SocketManager {
   }
 
   reconnect(): void {
-    console.log("Reconnecting socket...");
+    // console.log("Reconnecting socket...");
     this.disconnect();
     this.connect().catch(console.error);
   }

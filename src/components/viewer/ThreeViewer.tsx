@@ -494,7 +494,7 @@ function CameraController({
   const controlsRef = useRef<any>(null);
 
   const { updateCamera } = useCameraSync(projectId, (data) => {
-    console.log("Camera sync from:", data.username);
+    // console.log("Camera sync from:", data.username);
   });
 
   useEffect(() => {
